@@ -128,7 +128,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
     } else if (type == GCDIALOG_PROGRESSBAR) {
       progressbar = gtk_progress_bar_new();
       gtk_box_pack_start(GTK_BOX(vbox), progressbar, FALSE, TRUE, 5);
-    } else if (type == GCDIALOG_DROPDOWN) {
+    } else if (type >= GCDIALOG_DROPDOWN) {
       combobox = gtk_combo_box_new_text();
       gtk_box_pack_start(GTK_BOX(vbox), combobox, FALSE, TRUE, 5);
       buttons[0] = "gtk-ok";
