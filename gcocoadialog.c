@@ -569,6 +569,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
 }
 
 int error(int argc, char *argv[]) {
+#ifdef HELP
   int type = -1;
   if (argc == 3)
     type = gcocoadialog_type(argv[2]);
@@ -665,6 +666,7 @@ int error(int argc, char *argv[]) {
       "Escape key) -1 or \"delete\" will be returned depending on --string-output.\n";
   }
   printf(msg);
+#endif
   return 1;
 }
 
