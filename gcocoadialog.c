@@ -264,7 +264,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       if (type == GCDIALOG_FILTEREDLIST) {
         int n = 0;
         const char *col = args[i++];
-        while (col && strncmp(col, "--", 2) != 0) {
+        while (col && i <= narg && strncmp(col, "--", 2) != 0) {
           GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
           GtkTreeViewColumn *treecol =
             gtk_tree_view_column_new_with_attributes(col, renderer, "text", n++,
@@ -321,7 +321,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       const char *item = args[i++];
       int col = 0; // GCDIALOG_FILTEREDLIST
       GtkTreeIter iter; // GCDIALOG_FILTEREDLIST
-      while (item && strncmp(item, "--", 2) != 0) {
+      while (item && i <= narg && strncmp(item, "--", 2) != 0) {
         if (type == GCDIALOG_DROPDOWN || type == GCDIALOG_STANDARD_DROPDOWN) {
           gtk_combo_box_append_text(GTK_COMBO_BOX(combobox), item);
         } else if (type == GCDIALOG_FILTEREDLIST) {
