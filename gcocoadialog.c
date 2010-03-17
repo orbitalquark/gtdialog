@@ -33,19 +33,18 @@
 #include "gcocoadialog.h"
 
 // Default variables.
-GtkWidget *dialog = NULL, *text = NULL, *info_text = NULL;
-int string_output = 0, no_newline = 0;
-int width = -1, height = -1, timeout = 0;
+GtkWidget *dialog, *text, *info_text;
+int string_output, no_newline;
+int width, height, timeout;
 int RESPONSE_DELETE = -1; // timeout is 0
-char *out = NULL;
+char *out;
 
 // Dialog-specific variables.
-GtkWidget *entry = NULL, *textview = NULL, *progressbar = NULL,
-          *combobox = NULL, *treeview = NULL;
-GtkTextBuffer *buffer = NULL;
-GtkListStore *list = NULL;
-int focus_textbox = 0, selected = 0, indeterminate = 0;
-const char *buttons[3] = { NULL, NULL, NULL }, *scroll_to = "top";
+GtkWidget *entry, *textview, *progressbar, *combobox, *treeview;
+GtkTextBuffer *buffer;
+GtkListStore *list;
+int focus_textbox, selected, indeterminate;
+const char *buttons[3] = { NULL, NULL, NULL }, *scroll_to;
 
 GCDialogType gcocoadialog_type(const char *type) {
   if (strcmp(type, "msgbox") == 0)
@@ -142,6 +141,33 @@ static gboolean timeout_dialog(gpointer userdata) {
 }
 
 char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
+  // Default variables.
+  dialog = NULL;
+  text = NULL;
+  info_text = NULL;
+  string_output = 0;
+  no_newline = 0;
+  width = -1;
+  height = -1;
+  timeout = 0;
+  out = NULL;
+
+  // Dialog-specific variables.
+  entry = NULL;
+  textview = NULL;
+  progressbar = NULL;
+  combobox = NULL;
+  treeview = NULL;
+  buffer = NULL;
+  list = NULL;
+  focus_textbox = 0;
+  selected = 0;
+  indeterminate = 0;
+  buttons[0] = NULL;
+  buttons[1] = NULL;
+  buttons[2] = NULL;
+  scroll_to = "top";
+
   // Setup dialog.
   if (type != GCDIALOG_FILESELECT && type != GCDIALOG_FILESAVE) {
     dialog = gtk_dialog_new();
