@@ -84,8 +84,12 @@ static void close_dropdown(GtkWidget *dropdown, gpointer userdata) {
 
 static gboolean entry_keypress(GtkWidget *entry, GdkEventKey *event,
                                gpointer userdata) {
-  gtk_tree_model_filter_refilter(
-    GTK_TREE_MODEL_FILTER(gtk_tree_view_get_model(GTK_TREE_VIEW(treeview))));
+  GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(treeview));
+  gtk_tree_model_filter_refilter(GTK_TREE_MODEL_FILTER(model));
+  GtkTreeIter iter;
+  if (gtk_tree_model_get_iter_first(model, &iter))
+    gtk_tree_selection_select_iter(
+      gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview)), &iter);
   return FALSE;
 }
 
@@ -219,6 +223,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       width = 500;
       height = 360;
       entry = gtk_entry_new();
+      gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
       g_signal_connect(G_OBJECT(entry), "key-release-event",
                        G_CALLBACK(entry_keypress), NULL);
       gtk_box_pack_start(GTK_BOX(vbox), entry, FALSE, FALSE, 5);
