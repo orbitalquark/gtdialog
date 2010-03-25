@@ -119,9 +119,11 @@ static gboolean list_visible(GtkTreeModel *model, GtkTreeIter *iter,
                              gpointer userdata) {
   const char *text = gtk_entry_get_text(GTK_ENTRY(entry));
   if (strlen(text) > 0) {
-    char *value, *p;
+    text = g_utf8_strdown(text, -1);
+    char *value, *lower, *p;
     gtk_tree_model_get(model, iter, 0, &value, -1);
-    p = value;
+    lower = g_utf8_strdown(value, -1);
+    p = lower;
     char **tokens = g_strsplit(text, " ", 0);
     gboolean visible = TRUE;
     int i = 0;
@@ -132,7 +134,9 @@ static gboolean list_visible(GtkTreeModel *model, GtkTreeIter *iter,
       }
       p += strlen(tokens[i++]);
     }
+    free(text);
     free(value);
+    free(lower);
     g_strfreev(tokens);
     return visible;
   }
