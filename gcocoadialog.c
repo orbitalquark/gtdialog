@@ -117,9 +117,9 @@ static gboolean list_select(GtkTreeView *treeview, gboolean arg1,
 
 static gboolean list_visible(GtkTreeModel *model, GtkTreeIter *iter,
                              gpointer userdata) {
-  const char *text = gtk_entry_get_text(GTK_ENTRY(entry));
-  if (strlen(text) > 0) {
-    text = g_utf8_strdown(text, -1);
+  const char *entry_text = gtk_entry_get_text(GTK_ENTRY(entry));
+  if (strlen(entry_text) > 0) {
+    char *text = g_utf8_strdown(entry_text, -1);
     char *value, *lower, *p;
     gtk_tree_model_get(model, iter, 0, &value, -1);
     lower = g_utf8_strdown(value, -1);
@@ -309,18 +309,15 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
           gtk_tree_view_append_column(GTK_TREE_VIEW(treeview), treecol);
           col = args[i++];
         }
-        GType *cols = g_new0(GType, n + 1);
+        GType *cols = g_new0(GType, n);
         int j;
         for (j = 0; j < n; j++) cols[j] = G_TYPE_STRING;
-        cols[n] = G_TYPE_BOOLEAN; // visible flag
-        list = gtk_list_store_newv(n + 1, cols);
+        list = gtk_list_store_newv(n, cols);
         free(cols);
         GtkTreeModel *filter = gtk_tree_model_filter_new(GTK_TREE_MODEL(list),
                                                          NULL);
         gtk_tree_model_filter_set_visible_func(GTK_TREE_MODEL_FILTER(filter),
                                                list_visible, NULL, NULL);
-        gtk_tree_model_filter_set_visible_column(GTK_TREE_MODEL_FILTER(filter),
-                                                 n);
         gtk_tree_view_set_model(GTK_TREE_VIEW(treeview), filter);
         get_next_arg = 0;
         arg = col;
@@ -363,7 +360,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
           if (col == 0)
             gtk_list_store_append(list, &iter);
           gtk_list_store_set(list, &iter, col++, item, -1);
-          if (col == gtk_tree_model_get_n_columns(GTK_TREE_MODEL(list)) - 1)
+          if (col == gtk_tree_model_get_n_columns(GTK_TREE_MODEL(list)))
             col = 0; // new row
         }
         item = args[i++];
