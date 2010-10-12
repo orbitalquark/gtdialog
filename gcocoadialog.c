@@ -44,6 +44,7 @@ GtkWidget *entry, *textview, *progressbar, *combobox, *treeview;
 GtkTextBuffer *buffer;
 GtkListStore *list;
 int focus_textbox, selected, indeterminate;
+int search_col = 0, output_col = 0;
 const char *buttons[3] = { NULL, NULL, NULL }, *scroll_to;
 
 GCDialogType gcocoadialog_type(const char *type) {
@@ -97,7 +98,10 @@ static void list_foreach(GtkTreeModel *model, GtkTreePath *path,
                          GtkTreeIter *iter, gpointer userdata) {
   char *value;
   if (string_output) {
-    gtk_tree_model_get(model, iter, 0, &value, -1);
+    int cols = gtk_tree_model_get_n_columns(GTK_TREE_MODEL(list));
+    if (output_col >= cols)
+      output_col = cols - 1;
+    gtk_tree_model_get(model, iter, output_col, &value, -1);
   } else {
     path =
       gtk_tree_model_filter_convert_path_to_child_path(
@@ -121,7 +125,7 @@ static gboolean list_visible(GtkTreeModel *model, GtkTreeIter *iter,
   if (strlen(entry_text) > 0) {
     char *text = g_utf8_strdown(entry_text, -1);
     char *value, *lower, *p;
-    gtk_tree_model_get(model, iter, 0, &value, -1);
+    gtk_tree_model_get(model, iter, search_col, &value, -1);
     lower = g_utf8_strdown(value, -1);
     p = lower;
     char **tokens = g_strsplit(text, " ", 0);
@@ -383,6 +387,9 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       if (type >= GCDIALOG_INPUTBOX &&
           type <= GCDIALOG_SECURE_STANDARD_INPUTBOX)
         gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
+    } else if (strcmp(arg, "--output-column") == 0) {
+      if (type == GCDIALOG_FILTEREDLIST)
+        output_col = atoi(args[i++]);
     } else if (strcmp(arg, "--packages-as-directories") == 0) {
       //if (type == GCDIALOG_FILESELECT || type == GCDIALOG_FILESAVE)
         // not implemented
@@ -397,6 +404,13 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       if (type == GCDIALOG_TEXTBOX) {
         focus_textbox = 1;
         scroll_to = args[i++];
+      }
+    } else if (strcmp(arg, "--search-column") == 0) {
+      if (type == GCDIALOG_FILTEREDLIST) {
+        int cols = gtk_tree_model_get_n_columns(GTK_TREE_MODEL(list));
+        search_col = atoi(args[i++]);
+        if (search_col >= cols)
+          search_col = cols - 1;
       }
     } else if (strcmp(arg, "--select-directories") == 0) {
       //if (type == GCDIALOG_FILESELECT)
@@ -1098,7 +1112,7 @@ int error(int argc, char *argv[]) {
       "  --informative-text \"extra informative text to be displayed\"\n"
       "      The text for the label above the input box.\n"
       "  --columns list of columns\n"
-      "      required. These are the names of the columns in the list. list of columns\n"
+      "      Required. These are the names of the columns in the list. list of columns\n"
       "      should be space separated and given as multiple arguments (ie: don't\n"
       "      double quote the entire list. Provide it as you would multiple arguments\n"
       "      for any shell program).\n"
@@ -1109,6 +1123,10 @@ int error(int argc, char *argv[]) {
       "      should be space separated and given as multiple arguments (ie: don't\n"
       "      double quote the entire list. Provide it as you would multiple arguments\n"
       "      for any shell program).\n"
+      "  --search-column col\n"
+      "      Required after --columns. The column to use for searching. Default is 0.\n"
+      "  --output-column col\n"
+      "      The column to use for --string-output. Default is 0.\n"
       "  --button1 \"label for button 1\"\n"
       "      Required. The right-most button.\n"
       "  --button2 \"label for button 2\"\n"
