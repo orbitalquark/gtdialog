@@ -204,6 +204,9 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
       gtk_box_pack_start(GTK_BOX(vbox), entry, FALSE, TRUE, 5);
       buttons[0] = "gtk-ok";
+      if (type == GCDIALOG_STANDARD_INPUTBOX ||
+          type == GCDIALOG_SECURE_STANDARD_INPUTBOX)
+        buttons[1] = "gtk-cancel";
       if (type >= GCDIALOG_SECURE_INPUTBOX)
         gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
     } else if (type == GCDIALOG_TEXTBOX) {
@@ -227,6 +230,8 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       combobox = gtk_combo_box_new_text();
       gtk_box_pack_start(GTK_BOX(vbox), combobox, FALSE, TRUE, 5);
       buttons[0] = "gtk-ok";
+      if (type == GCDIALOG_STANDARD_DROPDOWN)
+        buttons[1] = "gtk-cancel";
     } else if (type == GCDIALOG_FILTEREDLIST) {
       width = 500;
       height = 360;
