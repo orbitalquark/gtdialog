@@ -186,7 +186,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
     gtk_window_set_title(GTK_WINDOW(dialog), "gcocoadialog");
     text = gtk_label_new("");
     info_text = gtk_label_new("");
-    GtkWidget *vbox = GTK_DIALOG(dialog)->vbox;
+    GtkWidget *vbox = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
     gtk_box_pack_start(GTK_BOX(vbox), text, FALSE, TRUE, 5);
     gtk_box_pack_start(GTK_BOX(vbox), info_text, FALSE, TRUE, 5);
     if (type == GCDIALOG_MSGBOX) {
@@ -227,7 +227,11 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       gtk_box_pack_start(GTK_BOX(vbox), progressbar, FALSE, TRUE, 5);
     } else if (type == GCDIALOG_DROPDOWN ||
                type == GCDIALOG_STANDARD_DROPDOWN) {
+#if GTK_CHECK_VERSION(3,0,0)
+      combobox = gtk_combo_box_text_new();
+#else
       combobox = gtk_combo_box_new_text();
+#endif
       gtk_box_pack_start(GTK_BOX(vbox), combobox, FALSE, TRUE, 5);
       buttons[0] = "gtk-ok";
       if (type == GCDIALOG_STANDARD_DROPDOWN)
@@ -364,7 +368,11 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       GtkTreeIter iter; // GCDIALOG_FILTEREDLIST
       while (item && i <= narg && strncmp(item, "--", 2) != 0) {
         if (type == GCDIALOG_DROPDOWN || type == GCDIALOG_STANDARD_DROPDOWN) {
+#if GTK_CHECK_VERSION(3,0,0)
+          gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combobox), item);
+#else
           gtk_combo_box_append_text(GTK_COMBO_BOX(combobox), item);
+#endif
         } else if (type == GCDIALOG_FILTEREDLIST) {
           if (col == 0)
             gtk_list_store_append(list, &iter);
@@ -546,7 +554,11 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
         } else if (type == GCDIALOG_DROPDOWN ||
                    type == GCDIALOG_STANDARD_DROPDOWN) {
           if (string_output) {
+#if GTK_CHECK_VERSION(3,0,0)
+            txt = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(combobox));
+#else
             txt = gtk_combo_box_get_active_text(GTK_COMBO_BOX(combobox));
+#endif
           } else {
             txt = malloc(4);
             sprintf(txt, "%i", gtk_combo_box_get_active(GTK_COMBO_BOX(combobox)));
