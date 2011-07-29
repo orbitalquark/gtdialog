@@ -280,7 +280,10 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       // not implemented
     } else if (strcmp(arg, "--height") == 0) {
       int h = atoi(args[i++]);
-      if (h > 0) gtk_widget_set_size_request(GTK_WIDGET(dialog), width, h);
+      if (h > 0) {
+        gtk_widget_set_size_request(GTK_WIDGET(dialog), width, h);
+        height = h;
+      }
     } else if (strcmp(arg, "--help") == 0) {
       // not implemented
     } else if (strcmp(arg, "--no-newline") == 0) {
@@ -291,7 +294,10 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       gtk_window_set_title(GTK_WINDOW(dialog), args[i++]);
     } else if (strcmp(arg, "--width") == 0) {
       int w = atoi(args[i++]);
-      if (w > 0) gtk_widget_set_size_request(GTK_WIDGET(dialog), w, height);
+      if (w > 0) {
+        gtk_widget_set_size_request(GTK_WIDGET(dialog), w, height);
+        width = w;
+      }
     // Dialog-specific options
     } else if (strcmp(arg, "--button1") == 0) {
       if (type == GCDIALOG_MSGBOX || type == GCDIALOG_INPUTBOX ||
