@@ -576,7 +576,8 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
             gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview)), list_foreach,
                                         gstr);
           txt = g_strdup(gstr->str);
-          txt[strlen(txt) - 1] = '\0'; // chomp '\n'
+          if (strlen(txt) > 0)
+            txt[strlen(txt) - 1] = '\0'; // chomp '\n'
           g_string_free(gstr, TRUE);
           created = 1;
         }
