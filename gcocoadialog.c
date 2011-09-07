@@ -46,6 +46,7 @@ GtkListStore *list;
 int focus_textbox, selected, indeterminate;
 int search_col = 0, output_col = 0;
 const char *buttons[3] = { NULL, NULL, NULL }, *scroll_to;
+PangoFontDescription *font = NULL;
 
 GCDialogType gcocoadialog_type(const char *type) {
   if (strcmp(type, "msgbox") == 0)
@@ -390,6 +391,12 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       }
       get_next_arg = 0;
       arg = item;
+    } else if (strcmp(arg, "--monospaced-font") == 0) {
+      if (type == GCDIALOG_TEXTBOX) {
+        font = pango_font_description_new();
+        pango_font_description_set_family(font, "monospace");
+        gtk_widget_modify_font(textview, font);
+      }
     } else if (strcmp(arg, "--no-cancel") == 0) {
       if (type == GCDIALOG_YESNO_MSGBOX) {
         buttons[2] = NULL;
@@ -557,6 +564,10 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
           gtk_text_buffer_get_start_iter(buffer, &s);
           gtk_text_buffer_get_end_iter(buffer, &e);
           txt = gtk_text_buffer_get_text(buffer, &s, &e, TRUE);
+          if (font) {
+            gtk_widget_modify_font(textview, NULL);
+            pango_font_description_free(font);
+          }
         } else if (type == GCDIALOG_DROPDOWN ||
                    type == GCDIALOG_STANDARD_DROPDOWN) {
           if (string_output) {
@@ -979,6 +990,8 @@ int error(int argc, char *argv[]) {
       "  --timeout numSeconds\n"
       "      The amount of time, in seconds, that the window will be displayed if the\n"
       "      user does not click a button. Does not time out by default.\n"
+      "  --monospaced-font\n"
+      "      A monospaced font is used in the text box instead of a proportional one."
       "\n"
       "Example:\n"
       "  gcocoadialog textbox --title \"License\" --no-newline \\\n"
