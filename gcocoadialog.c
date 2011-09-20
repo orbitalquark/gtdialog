@@ -455,6 +455,8 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
     } else if (strcmp(arg, "--selected") == 0) {
       if (type == GCDIALOG_TEXTBOX)
         selected = 1;
+      else if (type == GCDIALOG_DROPDOWN || type == GCDIALOG_STANDARD_DROPDOWN)
+        selected = atoi(args[i++]);
     } else if (strcmp(arg, "--text") == 0) {
       if (type != GCDIALOG_FILESELECT && type != GCDIALOG_FILESAVE) {
         if (type >= GCDIALOG_INPUTBOX &&
@@ -530,7 +532,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
         g_signal_emit_by_name(G_OBJECT(textview), "select-all", TRUE);
     } else if (type == GCDIALOG_DROPDOWN ||
                type == GCDIALOG_STANDARD_DROPDOWN) {
-      gtk_combo_box_set_active(GTK_COMBO_BOX(combobox), 0);
+      gtk_combo_box_set_active(GTK_COMBO_BOX(combobox), selected);
     }
     for (i = 3; i > 0; i--)
       if (buttons[i - 1])
@@ -1057,8 +1059,7 @@ int error(int argc, char *argv[]) {
       "      required. These are the labels for the options provided in the dropdown\n"
       "      box. list of values should be space separated, and given as multiple\n"
       "      arguments (ie: don't double quote the entire list. Provide it as you\n"
-      "      would multiple arguments for any shell program). The first item in the\n"
-      "      list is always selected by default.\n"
+      "      would multiple arguments for any shell program).\n"
       "      Example: gcocoadialog dropdown --text \"Favorite OS?\" --items \"GNU/Linux\"\n"
       "      \"OS X\" Windows Amiga \"TI 89\" --button1 gtk-ok\n"
       "  --pulldown\n"
@@ -1079,6 +1080,9 @@ int error(int argc, char *argv[]) {
       "      than waiting for the user to press one of the buttons. This makes the\n"
       "      return value for the button 4 (for both regular output and with\n"
       "      --string-output).\n"
+      "  --selected index\n"
+      "      The zero-based index of the item in the list to select. The first item in\n"
+      "      the list is always selected by default.\n"
       "  --float\n"
       "      Float on top of all windows.\n"
       "  --timeout numSeconds\n"
@@ -1113,8 +1117,7 @@ int error(int argc, char *argv[]) {
       "      required. These are the labels for the options provided in the dropdown\n"
       "      box. list of values should be space separated, and given as multiple\n"
       "      arguments (ie: don't double quote the entire list. Provide it as you\n"
-      "      would multiple arguments for any shell program). The first item in the\n"
-      "      list is always selected by default.\n"
+      "      would multiple arguments for any shell program).\n"
       "      Example: gcocoadialog dropdown --text \"Favorite OS?\" --items \"GNU/Linux\"\n"
       "      \"OS X\" Windows Amiga \"TI 89\" --button1 gtk-ok\n"
       "  --pulldown\n"
@@ -1123,6 +1126,9 @@ int error(int argc, char *argv[]) {
       "      probably isn't very useful for a single-function dialog such as those\n"
       "      gcocoadialog provides, but I've included it just in case it is. To see\n"
       "      how their appearances differ, just try them both.\n"
+      "  --selected index\n"
+      "      The zero-based index of the item in the list to select. The first item in\n"
+      "      the list is always selected by default.\n"
       "  --exit-onchange\n"
       "      Makes the program exit immediately after the selection changes, rather\n"
       "      than waiting for the user to press one of the buttons. This makes the\n"
