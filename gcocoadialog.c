@@ -44,7 +44,7 @@ GtkWidget *entry, *textview, *progressbar, *combobox, *treeview;
 GtkTextBuffer *buffer;
 GtkListStore *list;
 int focus_textbox, selected, indeterminate;
-int search_col = 0, output_col = 0;
+int search_col, output_col;
 const char *buttons[3] = { NULL, NULL, NULL }, *scroll_to;
 PangoFontDescription *font = NULL;
 
@@ -176,6 +176,8 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
   focus_textbox = 0;
   selected = 0;
   indeterminate = 0;
+  search_col = 0;
+  output_col = 0;
   buttons[0] = NULL;
   buttons[1] = NULL;
   buttons[2] = NULL;
