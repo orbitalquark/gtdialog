@@ -654,7 +654,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
 }
 
 int error(int argc, char *argv[]) {
-#ifdef HELP
+#ifndef NOHELP
   int type = -1;
   if (argc == 3)
     type = gcocoadialog_type(argv[2]);
@@ -1240,6 +1240,7 @@ int error(int argc, char *argv[]) {
   return 1;
 }
 
+#ifndef LIBRARY
 int main(int argc, char *argv[]) {
   if (argc == 1 || strcmp(argv[1], "help") == 0)
     return error(argc, argv);
@@ -1252,3 +1253,4 @@ int main(int argc, char *argv[]) {
   free(out);
   return 0;
 }
+#endif
