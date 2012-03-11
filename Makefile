@@ -6,7 +6,7 @@ gcocoadialog: gcocoadialog.o
 clean:
 	rm gcocoadialog gcocoadialog.o
 
-manual:
-	cd doc && lua gen_manual.lua
+manual: doc/*.md *.md
+	doc/bombay -d doc -t doc --title GCocoaDialog --navtitle Manual $^
 cleandoc:
 	rm -f doc/*.html
