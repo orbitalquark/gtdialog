@@ -1,5 +1,5 @@
 /**
- * A CocoaDialog clone written in C using GTK.
+ * A CocoaDialog clone written in C using GTK or ncurses.
  *
  * The MIT License
  *
@@ -28,25 +28,37 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if GTK
 #include <gtk/gtk.h>
+#elif NCURSES
+#include <cdk/cdk.h>
+#endif
 
 #include "gcocoadialog.h"
 
 // Default variables.
-GtkWidget *dialog, *text, *info_text;
-int string_output, no_newline;
-int width, height, timeout;
-int RESPONSE_DELETE = -1; // timeout is 0
-char *out;
+int string_output = 0;
+int output_col = 0, search_col = 0;
 
-// Dialog-specific variables.
-GtkWidget *entry, *textview, *progressbar, *combobox, *treeview;
-GtkTextBuffer *buffer;
-GtkListStore *list;
-int focus_textbox, selected, indeterminate;
-int search_col, output_col;
-const char *buttons[3] = { NULL, NULL, NULL }, *scroll_to;
-PangoFontDescription *font = NULL;
+#if GTK
+#define STR_OK "gtk-ok"
+#define STR_CANCEL "gtk-cancel"
+#define STR_YES "gtk-yes"
+#define STR_NO "gtk-no"
+#elif NCURSES
+#define STR_OK "Ok"
+#define STR_CANCEL "Cancel"
+#define STR_YES "Yes"
+#define STR_NO "No"
+#endif
+
+#if GTK
+#if GTK_CHECK_VERSION(3,0,0)
+#define gtk_combo_box_new_text gtk_combo_box_text_new
+#define gtk_combo_box_append_text gtk_combo_box_text_append_text
+#define gtk_combo_box_get_active_text gtk_combo_box_text_get_active_text
+#endif
+#endif
 
 GCDialogType gcocoadialog_type(const char *type) {
   if (strcmp(type, "msgbox") == 0)
@@ -80,18 +92,20 @@ GCDialogType gcocoadialog_type(const char *type) {
   return -1;
 }
 
+// Callbacks and utility functions.
+#if GTK
 static void close_dropdown(GtkWidget *dropdown, gpointer userdata) {
-  g_signal_emit_by_name(dialog, "response", 4);
+  g_signal_emit_by_name(userdata, "response", 4);
 }
 
 static gboolean entry_keypress(GtkWidget *entry, GdkEventKey *event,
                                gpointer userdata) {
-  GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(treeview));
+  GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(userdata));
   gtk_tree_model_filter_refilter(GTK_TREE_MODEL_FILTER(model));
   GtkTreeIter iter;
   if (gtk_tree_model_get_iter_first(model, &iter))
     gtk_tree_selection_select_iter(
-      gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview)), &iter);
+      gtk_tree_view_get_selection(GTK_TREE_VIEW(userdata)), &iter);
   return FALSE;
 }
 
@@ -99,9 +113,8 @@ static void list_foreach(GtkTreeModel *model, GtkTreePath *path,
                          GtkTreeIter *iter, gpointer userdata) {
   char *value;
   if (string_output) {
-    int cols = gtk_tree_model_get_n_columns(GTK_TREE_MODEL(list));
-    if (output_col >= cols)
-      output_col = cols - 1;
+    if (output_col >= gtk_tree_model_get_n_columns(model))
+      output_col = gtk_tree_model_get_n_columns(model) - 1;
     gtk_tree_model_get(model, iter, output_col, &value, -1);
   } else {
     path =
@@ -116,13 +129,13 @@ static void list_foreach(GtkTreeModel *model, GtkTreePath *path,
 
 static gboolean list_select(GtkTreeView *treeview, gboolean arg1,
                             gpointer userdata) {
-  g_signal_emit_by_name(dialog, "response", 1);
+  g_signal_emit_by_name(userdata, "response", 1);
   return FALSE;
 }
 
 static gboolean list_visible(GtkTreeModel *model, GtkTreeIter *iter,
                              gpointer userdata) {
-  const char *entry_text = gtk_entry_get_text(GTK_ENTRY(entry));
+  const char *entry_text = gtk_entry_get_text(GTK_ENTRY(userdata));
   if (strlen(entry_text) > 0) {
     char *text = g_utf8_strdown(entry_text, -1);
     char *value, *lower, *p;
@@ -149,129 +162,109 @@ static gboolean list_visible(GtkTreeModel *model, GtkTreeIter *iter,
 }
 
 static gboolean timeout_dialog(gpointer userdata) {
-  g_signal_emit_by_name(dialog, "response", 0);
+  g_signal_emit_by_name(userdata, "response", 0);
   return FALSE;
 }
+#elif NCURSES
+static int wrap(char *str, int w, char ***plines) {
+  int i;
+  for (i = w; i < strlen(str); i += w) {
+    int j = i;
+    while (j >= 0 && !isspace(str[j]))
+      j--;
+    if (j + w > i) {
+      i = j; // line length is less than w; cut here
+      str[i++] = '\n';
+    }
+  }
+  int nlines = 1;
+  char *p = str - 1;
+  while ((p = strstr(p + 1, "\n")))
+    nlines++;
+  char **lines = malloc(nlines * sizeof(char *));
+  lines[0] = str;
+  for (i = 1; i < nlines; i++) {
+    p = strstr(lines[i - 1], "\n");
+    *p = '\0';
+    lines[i] = p + 1;
+  }
+  *plines = lines;
+  return nlines;
+}
+
+static int buttonbox_tab(EObjectType cdkType, void *object, void *data,
+                         chtype key) {
+  injectCDKButtonbox((CDKBUTTONBOX *)data, key);
+  return TRUE;
+}
+#endif
 
 char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
+  int RESPONSE_DELETE = -1; // timeout is 0
+  char *out = NULL;
+
   // Default variables.
-  dialog = NULL;
-  text = NULL;
-  info_text = NULL;
+  int height = -1, floating = 0, no_newline = 0, timeout = 0, width = -1;
+  const char *title = "gcocoadialog";
   string_output = 0;
-  no_newline = 0;
-  width = -1;
-  height = -1;
-  timeout = 0;
-  out = NULL;
 
   // Dialog-specific variables.
-  entry = NULL;
-  textview = NULL;
-  progressbar = NULL;
-  combobox = NULL;
-  treeview = NULL;
-  buffer = NULL;
-  list = NULL;
-  focus_textbox = 0;
-  selected = 0;
-  indeterminate = 0;
-  search_col = 0;
-  output_col = 0;
-  buttons[0] = NULL;
-  buttons[1] = NULL;
-  buttons[2] = NULL;
-  scroll_to = "top";
-
-  // Setup dialog.
-  if (type != GCDIALOG_FILESELECT && type != GCDIALOG_FILESAVE) {
-    dialog = gtk_dialog_new();
-    gtk_window_set_title(GTK_WINDOW(dialog), "gcocoadialog");
-    text = gtk_label_new("");
-    info_text = gtk_label_new("");
-    GtkWidget *vbox = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
-    gtk_box_pack_start(GTK_BOX(vbox), text, FALSE, TRUE, 5);
-    gtk_box_pack_start(GTK_BOX(vbox), info_text, FALSE, TRUE, 5);
-    if (type == GCDIALOG_MSGBOX) {
-      buttons[0] = "gtk-ok";
-    } else if (type == GCDIALOG_OK_MSGBOX) {
-      buttons[0] = "gtk-ok";
-      buttons[1] = "gtk-cancel";
-    } else if (type == GCDIALOG_YESNO_MSGBOX) {
-      buttons[0] = "gtk-yes";
-      buttons[1] = "gtk-no";
-      buttons[2] = "gtk-cancel";
-    } else if (type >= GCDIALOG_INPUTBOX &&
-               type <= GCDIALOG_SECURE_STANDARD_INPUTBOX) {
-      entry = gtk_entry_new();
-      gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
-      gtk_box_pack_start(GTK_BOX(vbox), entry, FALSE, TRUE, 5);
-      buttons[0] = "gtk-ok";
-      if (type == GCDIALOG_STANDARD_INPUTBOX ||
-          type == GCDIALOG_SECURE_STANDARD_INPUTBOX)
-        buttons[1] = "gtk-cancel";
-      if (type >= GCDIALOG_SECURE_INPUTBOX)
-        gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
-    } else if (type == GCDIALOG_TEXTBOX) {
-      width = 400;
-      height = 300;
-      textview = gtk_text_view_new();
-      buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview));
-      gtk_text_view_set_editable(GTK_TEXT_VIEW(textview), FALSE);
-      GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
-      gtk_container_add(GTK_CONTAINER(scrolled), textview);
-      gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled),
-                                     GTK_POLICY_AUTOMATIC,
-                                     GTK_POLICY_AUTOMATIC);
-      gtk_box_pack_start(GTK_BOX(vbox), scrolled, TRUE, TRUE, 5);
-      buttons[0] = "gtk-ok";
-    } else if (type == GCDIALOG_PROGRESSBAR) {
-      progressbar = gtk_progress_bar_new();
-      gtk_box_pack_start(GTK_BOX(vbox), progressbar, FALSE, TRUE, 5);
-    } else if (type == GCDIALOG_DROPDOWN ||
-               type == GCDIALOG_STANDARD_DROPDOWN) {
-#if GTK_CHECK_VERSION(3,0,0)
-      combobox = gtk_combo_box_text_new();
-#else
-      combobox = gtk_combo_box_new_text();
+  int editable = 0, exit_onchange = 0, focus_textbox = 0, indeterminate = 0,
+      no_show = 0, percent = 0, multiple = 0, only_dirs = 0, selected = 0;
+  const char *buttons[3] = { NULL, NULL, NULL}, **cols = NULL,
+             *info_text = NULL, **items = NULL, *scroll_to = "top",
+             *text = NULL, *dir = NULL, *file = NULL;
+  int ncols = 0, len = 0;
+#if GTK
+  PangoFontDescription *font = NULL;
+  GtkFileFilter *filter = NULL;
 #endif
-      gtk_box_pack_start(GTK_BOX(vbox), combobox, FALSE, TRUE, 5);
-      buttons[0] = "gtk-ok";
-      if (type == GCDIALOG_STANDARD_DROPDOWN)
-        buttons[1] = "gtk-cancel";
-    } else if (type == GCDIALOG_FILTEREDLIST) {
-      width = 500;
-      height = 360;
-      entry = gtk_entry_new();
-      gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
-      g_signal_connect(G_OBJECT(entry), "key-release-event",
-                       G_CALLBACK(entry_keypress), NULL);
-      gtk_box_pack_start(GTK_BOX(vbox), entry, FALSE, FALSE, 5);
-      GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
-      gtk_box_pack_start(GTK_BOX(vbox), scrolled, TRUE, TRUE, 0);
-      treeview = gtk_tree_view_new();
-      gtk_tree_view_set_enable_search(GTK_TREE_VIEW(treeview), TRUE);
-      g_signal_connect(G_OBJECT(treeview), "select-cursor-row",
-                       G_CALLBACK(list_select), NULL);
-      gtk_container_add(GTK_CONTAINER(scrolled), treeview);
-      buttons[0] = "gtk-ok";
-    }
-    if (width > 0 && height > 0)
-       gtk_widget_set_size_request(GTK_WIDGET(dialog), width, height);
-  } else if (type == GCDIALOG_FILESELECT) {
-    dialog = gtk_file_chooser_dialog_new("", NULL, GTK_FILE_CHOOSER_ACTION_OPEN,
-                                         GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-                                         GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
-                                         NULL);
-  } else if (type == GCDIALOG_FILESAVE) {
-    dialog = gtk_file_chooser_dialog_new("", NULL, GTK_FILE_CHOOSER_ACTION_SAVE,
-                                         GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-                                         GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT,
-                                         NULL);
-    gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog),
-                                                   TRUE);
+  output_col = 0;
+  search_col = 0;
+
+  // Set dialog defaults.
+#if NCURSES
+  width = 40;
+  height = 10;
+#endif
+  if (type == GCDIALOG_MSGBOX) {
+    buttons[0] = STR_OK;
+  } else if (type == GCDIALOG_OK_MSGBOX) {
+    buttons[0] = STR_OK;
+    buttons[1] = STR_CANCEL;
+  } else if (type == GCDIALOG_YESNO_MSGBOX) {
+    buttons[0] = STR_YES;
+    buttons[1] = STR_NO;
+    buttons[2] = STR_CANCEL;
+  } else if (type >= GCDIALOG_INPUTBOX &&
+             type <= GCDIALOG_SECURE_STANDARD_INPUTBOX) {
+    buttons[0] = STR_OK;
+    if (type == GCDIALOG_STANDARD_INPUTBOX ||
+        type == GCDIALOG_SECURE_STANDARD_INPUTBOX)
+      buttons[1] = STR_CANCEL;
+  } else if (type == GCDIALOG_FILESELECT || type == GCDIALOG_FILESAVE) {
+#if NCURSES
+    height = 20;
+#endif
+  } else if (type == GCDIALOG_TEXTBOX) {
+#if GTK
+    width = 400;
+    height = 300;
+#elif NCURSES
+    height = 20;
+#endif
+    buttons[0] = STR_OK;
+  } else if (type == GCDIALOG_DROPDOWN || type == GCDIALOG_STANDARD_DROPDOWN) {
+    buttons[0] = STR_OK;
+    if (type == GCDIALOG_STANDARD_DROPDOWN)
+      buttons[1] = STR_CANCEL;
+  } else if (type == GCDIALOG_FILTEREDLIST) {
+#if GTK
+    width = 500;
+    height = 360;
+#endif
+    buttons[0] = STR_OK;
   }
-  gtk_window_set_wmclass(GTK_WINDOW(dialog), "gcocoadialog", "gcocoadialog");
 
   // Parse arguments.
   int i = 0;
@@ -283,10 +276,8 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       // not implemented
     } else if (strcmp(arg, "--height") == 0) {
       int h = atoi(args[i++]);
-      if (h > 0) {
-        gtk_widget_set_size_request(GTK_WIDGET(dialog), width, h);
+      if (h > 0)
         height = h;
-      }
     } else if (strcmp(arg, "--help") == 0) {
       // not implemented
     } else if (strcmp(arg, "--no-newline") == 0) {
@@ -294,13 +285,11 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
     } else if (strcmp(arg, "--string-output") == 0) {
       string_output = 1;
     } else if (strcmp(arg, "--title") == 0) {
-      gtk_window_set_title(GTK_WINDOW(dialog), args[i++]);
+      title = args[i++];
     } else if (strcmp(arg, "--width") == 0) {
       int w = atoi(args[i++]);
-      if (w > 0) {
-        gtk_widget_set_size_request(GTK_WIDGET(dialog), w, height);
+      if (w > 0)
         width = w;
-      }
     // Dialog-specific options
     } else if (strcmp(arg, "--button1") == 0) {
       if (type == GCDIALOG_MSGBOX || type == GCDIALOG_INPUTBOX ||
@@ -319,42 +308,21 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
         buttons[2] = args[i++];
     } else if (strcmp(arg, "--columns") == 0) {
       if (type == GCDIALOG_FILTEREDLIST) {
-        int n = 0;
-        const char *col = args[i++];
-        while (col && i <= narg && strncmp(col, "--", 2) != 0) {
-          GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
-          GtkTreeViewColumn *treecol =
-            gtk_tree_view_column_new_with_attributes(col, renderer, "text", n++,
-                                                     NULL);
-          gtk_tree_view_column_set_sizing(treecol,
-                                          GTK_TREE_VIEW_COLUMN_AUTOSIZE);
-          gtk_tree_view_append_column(GTK_TREE_VIEW(treeview), treecol);
-          col = args[i++];
-        }
-        GType *cols = g_new0(GType, n);
-        int j;
-        for (j = 0; j < n; j++) cols[j] = G_TYPE_STRING;
-        list = gtk_list_store_newv(n, cols);
-        free(cols);
-        GtkTreeModel *filter = gtk_tree_model_filter_new(GTK_TREE_MODEL(list),
-                                                         NULL);
-        gtk_tree_model_filter_set_visible_func(GTK_TREE_MODEL_FILTER(filter),
-                                               list_visible, NULL, NULL);
-        gtk_tree_view_set_model(GTK_TREE_VIEW(treeview), filter);
-        get_next_arg = 0;
-        arg = col;
+        cols = &args[i];
+        ncols = 0;
+        while (i < narg && strncmp(args[i], "--", 2) != 0)
+          ncols++, i++;
       }
     } else if (strcmp(arg, "--editable") == 0) {
       if (type == GCDIALOG_TEXTBOX)
-        gtk_text_view_set_editable(GTK_TEXT_VIEW(textview), TRUE);
+        editable = 1;
     } else if (strcmp(arg, "--exit-onchange") == 0) {
       if (type == GCDIALOG_DROPDOWN || type == GCDIALOG_STANDARD_DROPDOWN)
-        g_signal_connect(G_OBJECT(dialog), "changed",
-                         G_CALLBACK(close_dropdown), NULL);
+        exit_onchange = 1;
     } else if (strcmp(arg, "--float") == 0) {
       if (type != GCDIALOG_FILESELECT && type != GCDIALOG_FILESAVE &&
           type != GCDIALOG_PROGRESSBAR)
-        gtk_window_set_keep_above(GTK_WINDOW(dialog), TRUE);
+        floating = 1;
     } else if (strcmp(arg, "--focus-textbox") == 0) {
       if (type == GCDIALOG_TEXTBOX)
         focus_textbox = 1;
@@ -370,35 +338,19 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
     } else if (strcmp(arg, "--informative-text") == 0) {
       if (type < GCDIALOG_FILESELECT || type == GCDIALOG_TEXTBOX ||
           type == GCDIALOG_FILTEREDLIST)
-        gtk_label_set_markup(GTK_LABEL(info_text), args[i++]);
+        info_text = args[i++];
     } else if (strcmp(arg, "--items") == 0) {
-      const char *item = args[i++];
-      int col = 0; // GCDIALOG_FILTEREDLIST
-      GtkTreeIter iter; // GCDIALOG_FILTEREDLIST
-      while (item && i <= narg && strncmp(item, "--", 2) != 0) {
-        if (type == GCDIALOG_DROPDOWN || type == GCDIALOG_STANDARD_DROPDOWN) {
-#if GTK_CHECK_VERSION(3,0,0)
-          gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combobox), item);
-#else
-          gtk_combo_box_append_text(GTK_COMBO_BOX(combobox), item);
-#endif
-        } else if (type == GCDIALOG_FILTEREDLIST) {
-          if (col == 0)
-            gtk_list_store_append(list, &iter);
-          gtk_list_store_set(list, &iter, col++, item, -1);
-          if (col == gtk_tree_model_get_n_columns(GTK_TREE_MODEL(list)))
-            col = 0; // new row
-        }
-        item = args[i++];
-      }
-      get_next_arg = 0;
-      arg = item;
+      items = &args[i];
+      len = 0;
+      while (i < narg && strncmp(args[i], "--", 2) != 0)
+        len++, i++;
     } else if (strcmp(arg, "--monospaced-font") == 0) {
+#if GTK
       if (type == GCDIALOG_TEXTBOX) {
         font = pango_font_description_new();
         pango_font_description_set_family(font, "monospace");
-        gtk_widget_modify_font(textview, font);
       }
+#endif
     } else if (strcmp(arg, "--no-cancel") == 0) {
       if (type == GCDIALOG_YESNO_MSGBOX) {
         buttons[2] = NULL;
@@ -414,7 +366,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
    } else if (strcmp(arg, "--no-show") == 0) {
       if (type >= GCDIALOG_INPUTBOX &&
           type <= GCDIALOG_SECURE_STANDARD_INPUTBOX)
-        gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
+        no_show = 1;
     } else if (strcmp(arg, "--output-column") == 0) {
       if (type == GCDIALOG_FILTEREDLIST)
         output_col = atoi(args[i++]);
@@ -423,8 +375,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
         // not implemented
     } else if (strcmp(arg, "--percent") == 0) {
       if (type == GCDIALOG_PROGRESSBAR)
-        gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progressbar),
-                                      0.01 * atoi(args[i++]));
+        percent = atoi(args[i++]);
     } else if (strcmp(arg, "--pulldown") == 0) {
       //if (type == GCDIALOG_DROPDOWN || type == GCDIALOG_STANDARD_DROPDOWN)
         // not implemented
@@ -435,95 +386,191 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       }
     } else if (strcmp(arg, "--search-column") == 0) {
       if (type == GCDIALOG_FILTEREDLIST) {
-        int cols = gtk_tree_model_get_n_columns(GTK_TREE_MODEL(list));
         search_col = atoi(args[i++]);
-        if (search_col >= cols)
-          search_col = cols - 1;
+        if (search_col >= ncols)
+          search_col = ncols - 1;
       }
     } else if (strcmp(arg, "--select-directories") == 0) {
       //if (type == GCDIALOG_FILESELECT)
         // not implemented
     } else if (strcmp(arg, "--select-multiple") == 0) {
-      if (type == GCDIALOG_FILESELECT)
-        gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), TRUE);
-      else if (type == GCDIALOG_FILTEREDLIST)
-        gtk_tree_selection_set_mode(
-          gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview)),
-                                      GTK_SELECTION_MULTIPLE);
+      if (type == GCDIALOG_FILESELECT || type == GCDIALOG_FILTEREDLIST)
+        multiple = 1;
     } else if (strcmp(arg, "--select-only-directories") == 0) {
       if (type == GCDIALOG_FILESELECT)
-        gtk_file_chooser_set_action(GTK_FILE_CHOOSER(dialog),
-                                    GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
+        only_dirs = 1;
     } else if (strcmp(arg, "--selected") == 0) {
       if (type == GCDIALOG_TEXTBOX)
         selected = 1;
       else if (type == GCDIALOG_DROPDOWN || type == GCDIALOG_STANDARD_DROPDOWN)
         selected = atoi(args[i++]);
     } else if (strcmp(arg, "--text") == 0) {
-      if (type != GCDIALOG_FILESELECT && type != GCDIALOG_FILESAVE) {
-        if (type >= GCDIALOG_INPUTBOX &&
-            type <= GCDIALOG_SECURE_STANDARD_INPUTBOX ||
-            type == GCDIALOG_FILTEREDLIST) {
-          gtk_entry_set_text(GTK_ENTRY(entry), args[i++]);
-        } else if (type == GCDIALOG_TEXTBOX) {
-          const char *txt = args[i++];
-          gtk_text_buffer_set_text(buffer, txt, strlen(txt));
-        } else if (type == GCDIALOG_PROGRESSBAR) {
-          gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), args[i++]);
-        } else {
-          gtk_label_set_markup(GTK_LABEL(text), args[i++]);
-        }
-      }
+        text = args[i++];
     } else if (strcmp(arg, "--text-from-file") == 0) {
-      if (type == GCDIALOG_TEXTBOX) {
-        FILE *f = fopen(args[i++], "r");
-        if (f) {
-          fseek(f, 0, SEEK_END);
-          int len = ftell(f);
-          char *buf = malloc(len);
-          rewind(f);
-          fread(buf, 1, len, f);
-          gtk_text_buffer_set_text(buffer, buf, len);
-          free(buf);
-          fclose(f);
-        }
-      }
+      if (type == GCDIALOG_TEXTBOX)
+        file = args[i++];
     } else if (strcmp(arg, "--timeout") == 0) {
       if (type != GCDIALOG_FILESELECT && type != GCDIALOG_FILESAVE &&
           type != GCDIALOG_PROGRESSBAR)
         timeout = atoi(args[i++]);
     } else if (strcmp(arg, "--with-directory") == 0) {
       if (type == GCDIALOG_FILESELECT || type == GCDIALOG_FILESAVE)
-        gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog),
-                                            args[i++]);
+        dir = args[i++];
     } else if (strcmp(arg, "--with-extension") == 0) {
       if (type == GCDIALOG_FILESELECT || type == GCDIALOG_FILESAVE) {
-        GtkFileFilter *filter = gtk_file_filter_new();
+#if GTK
+        filter = gtk_file_filter_new();
+#endif
         const char *ext = args[i++];
         while (ext && strncmp(ext, "--", 2) != 0) {
+#if GTK
           char *glob = g_strconcat((*ext == '.') ? "*" : "*.", ext, NULL);
           gtk_file_filter_add_pattern(filter, glob);
           g_free(glob);
+#endif
           ext = args[i++];
         }
-        gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
         get_next_arg = 0;
         arg = ext;
       }
     } else if (strcmp(arg, "--with-file") == 0) {
       if (type == GCDIALOG_FILESELECT || type == GCDIALOG_FILESAVE)
-        gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), args[i++]);
+        file = args[i++];
     }
     if (get_next_arg) arg = args[i++];
   }
 
-  // Run dialog; text output is stored in 'out'
-  if (type != GCDIALOG_FILESELECT && type != GCDIALOG_FILESAVE &&
-      type != GCDIALOG_PROGRESSBAR) {
-    if (type == GCDIALOG_TEXTBOX) {
-      if (!focus_textbox &&
-          !gtk_text_view_get_editable(GTK_TEXT_VIEW(textview)))
+  // Create dialog.
+#if GTK
+  GtkWidget *dialog, *entry, *textview, *progressbar, *combobox, *treeview;
+  GtkListStore *list;
+#elif NCURSES
+  CDKSCREEN *dialog;
+  CDKENTRY *entry;
+  CDKMENTRY *textview;
+  CDKSLIDER *progressbar;
+  CDKITEMLIST *combobox;
+  CDKBUTTONBOX *buttonbox;
+  CDKFSELECT *fileselect;
+#endif
+  if (type != GCDIALOG_FILESELECT && type != GCDIALOG_FILESAVE) {
+#if GTK
+    dialog = gtk_dialog_new();
+    gtk_window_set_title(GTK_WINDOW(dialog), title);
+    if (floating)
+      gtk_window_set_keep_above(GTK_WINDOW(dialog), TRUE);
+    gtk_widget_set_size_request(GTK_WIDGET(dialog), width, height);
+#elif NCURSES
+    // There will be a border drawn later, but account for it now.
+    dialog = initCDKScreen(newwin(height - 2, width - 2, 1, 1));
+#endif
+    // Create buttons.
+    if (type != GCDIALOG_PROGRESSBAR) {
+#if GTK
+      for (i = 3; i > 0; i--)
+        if (buttons[i - 1])
+          gtk_dialog_add_button(GTK_DIALOG(dialog), buttons[i - 1], i);
+      gtk_dialog_set_default_response(GTK_DIALOG(dialog), 1);
+#elif NCURSES
+      int nbuttons = 0;
+      for (i = 0; i < 3; i++)
+        if (buttons[i])
+          nbuttons++;
+      buttonbox = newCDKButtonbox(dialog, 0, BOTTOM, 1, 0, "", 1, nbuttons,
+                                  (char **)buttons, nbuttons, A_REVERSE, TRUE,
+                                  FALSE);
+      setCDKButtonboxCurrentButton(buttonbox, 0);
+#endif
+    }
+    // Create dialog content.
+#if GTK
+    GtkWidget *vbox = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+    if (text)
+      gtk_box_pack_start(GTK_BOX(vbox), gtk_label_new(text), FALSE, TRUE, 5);
+    if (info_text)
+      gtk_box_pack_start(GTK_BOX(vbox), gtk_label_new(info_text), FALSE, TRUE,
+                         5);
+#endif
+    if (type <= GCDIALOG_YESNO_MSGBOX) {
+#if NCURSES
+      char **lines;
+      int nlines;
+      if (text) {
+        nlines = wrap((char *)text, width - 2, &lines);
+        newCDKLabel(dialog, LEFT, TOP, lines, nlines, FALSE, FALSE);
+        free(lines);
+      }
+      if (info_text) {
+        nlines = wrap((char *)info_text, width - 2, &lines);
+        newCDKLabel(dialog, LEFT, CENTER, lines, nlines, FALSE, FALSE);
+        free(lines);
+      }
+#endif
+    } else if (type >= GCDIALOG_INPUTBOX &&
+               type <= GCDIALOG_SECURE_STANDARD_INPUTBOX) {
+#if GTK
+      entry = gtk_entry_new();
+      gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
+      gtk_box_pack_start(GTK_BOX(vbox), entry, FALSE, TRUE, 5);
+      if (type >= GCDIALOG_SECURE_INPUTBOX || no_show)
+        gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
+      if (text)
+        gtk_entry_set_text(GTK_ENTRY(entry), text);
+#elif NCURSES
+      EDisplayType display = vMIXED;
+      if (type >= GCDIALOG_SECURE_INPUTBOX || no_show)
+        display = vHMIXED;
+      entry = newCDKEntry(dialog, LEFT, TOP, (char *)title, (char *)info_text,
+                          A_NORMAL, '_', display, 0, 0, 100, FALSE, FALSE);
+      bindCDKObject(vENTRY, entry, KEY_TAB, buttonbox_tab, buttonbox);
+      bindCDKObject(vENTRY, entry, KEY_BTAB, buttonbox_tab, buttonbox);
+      if (text)
+        setCDKEntryValue(entry, (char *)text);
+#endif
+    } else if (type == GCDIALOG_TEXTBOX) {
+#if GTK
+      textview = gtk_text_view_new();
+      gtk_text_view_set_editable(GTK_TEXT_VIEW(textview), editable);
+      if (!focus_textbox && !editable)
         g_object_set(G_OBJECT(textview), "can-focus", FALSE, NULL);
+      GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
+      gtk_container_add(GTK_CONTAINER(scrolled), textview);
+      gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled),
+                                     GTK_POLICY_AUTOMATIC,
+                                     GTK_POLICY_AUTOMATIC);
+      gtk_box_pack_start(GTK_BOX(vbox), scrolled, TRUE, TRUE, 5);
+      if (font)
+        gtk_widget_modify_font(textview, font);
+      GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview));
+      if (text)
+        gtk_text_buffer_set_text(buffer, text, strlen(text));
+#elif NCURSES
+      EDisplayType display = editable ? vVIEWONLY : vMIXED;
+      textview = newCDKMentry(dialog, LEFT, TOP, (char *)title,
+                              (char *)info_text, A_NORMAL, '_', display, 0,
+                              height - 8, height - 8, 0, FALSE, FALSE);
+      if (text)
+        setCDKMentryValue(textview, (char *)text);
+#endif
+      if (file) {
+        FILE *f = fopen(file, "r");
+        if (f) {
+          fseek(f, 0, SEEK_END);
+          int len = ftell(f);
+          char *buf = malloc(len + 1);
+          rewind(f);
+          fread(buf, 1, len, f);
+          buf[len] = '\0';
+#if GTK
+          gtk_text_buffer_set_text(buffer, buf, len);
+#elif NCURSES
+          setCDKMentryValue(textview, buf);
+#endif
+          free(buf);
+          fclose(f);
+        }
+      }
+#if GTK
       if (strcmp(scroll_to, "top") == 0)
         g_signal_emit_by_name(G_OBJECT(textview), "move-cursor",
                               GTK_MOVEMENT_BUFFER_ENDS, -1, 0);
@@ -532,21 +579,184 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
                               GTK_MOVEMENT_BUFFER_ENDS, 1, 0);
       if (selected)
         g_signal_emit_by_name(G_OBJECT(textview), "select-all", TRUE);
+#elif NCURSES
+      if (strcmp(scroll_to, "top") == 0)
+        injectCDKMentry(textview, KEY_HOME);
+      else
+        injectCDKMentry(textview, KEY_END);
+#endif
+    } else if (type == GCDIALOG_PROGRESSBAR) {
+#if GTK
+      progressbar = gtk_progress_bar_new();
+      gtk_box_pack_start(GTK_BOX(vbox), progressbar, FALSE, TRUE, 5);
+      if (percent)
+        gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progressbar),
+                                      0.01 * percent);
+      if (text)
+        gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), text);
+#elif NCURSES
+#endif
     } else if (type == GCDIALOG_DROPDOWN ||
                type == GCDIALOG_STANDARD_DROPDOWN) {
+#if GTK
+      combobox = gtk_combo_box_text_new();
+      combobox = gtk_combo_box_new_text();
+      gtk_box_pack_start(GTK_BOX(vbox), combobox, FALSE, TRUE, 5);
+      if (exit_onchange)
+        g_signal_connect(G_OBJECT(combobox), "changed",
+                         G_CALLBACK(close_dropdown), (gpointer)dialog);
+      for (i = 0; i < len; i++)
+        gtk_combo_box_append_text(GTK_COMBO_BOX(combobox), items[i]);
       gtk_combo_box_set_active(GTK_COMBO_BOX(combobox), selected);
+#elif NCURSES
+      combobox = newCDKItemlist(dialog, LEFT, TOP, (char *)title,
+                                (char *)info_text, (char **)items, len, 0,
+                                FALSE, FALSE);
+#endif
+    } else if (type == GCDIALOG_FILTEREDLIST) {
+#if GTK
+      entry = gtk_entry_new();
+      gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
+      gtk_box_pack_start(GTK_BOX(vbox), entry, FALSE, FALSE, 5);
+      GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
+      gtk_box_pack_start(GTK_BOX(vbox), scrolled, TRUE, TRUE, 0);
+      treeview = gtk_tree_view_new();
+      gtk_tree_view_set_enable_search(GTK_TREE_VIEW(treeview), TRUE);
+      g_signal_connect(G_OBJECT(treeview), "select-cursor-row",
+                       G_CALLBACK(list_select), (gpointer)dialog);
+      for (i = 0; i < ncols; i++) {
+        GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
+        GtkTreeViewColumn *treecol =
+          gtk_tree_view_column_new_with_attributes(cols[i], renderer, "text", i,
+                                                   NULL);
+        gtk_tree_view_column_set_sizing(treecol, GTK_TREE_VIEW_COLUMN_AUTOSIZE);
+        gtk_tree_view_append_column(GTK_TREE_VIEW(treeview), treecol);
+      }
+      GType *cols = g_new0(GType, ncols);
+      for (i = 0; i < ncols; i++)
+        cols[i] = G_TYPE_STRING;
+      list = gtk_list_store_newv(ncols, cols);
+      free(cols);
+      GtkTreeModel *filter = gtk_tree_model_filter_new(GTK_TREE_MODEL(list),
+                                                       NULL);
+      gtk_tree_model_filter_set_visible_func(GTK_TREE_MODEL_FILTER(filter),
+                                             list_visible, (gpointer)entry,
+                                             NULL);
+      gtk_tree_view_set_model(GTK_TREE_VIEW(treeview), filter);
+      g_signal_connect(G_OBJECT(entry), "key-release-event",
+                       G_CALLBACK(entry_keypress), (gpointer)treeview);
+      gtk_container_add(GTK_CONTAINER(scrolled), treeview);
+      if (multiple)
+        gtk_tree_selection_set_mode(
+          gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview)),
+                                      GTK_SELECTION_MULTIPLE);
+      if (text)
+        gtk_entry_set_text(GTK_ENTRY(entry), text);
+      int col = 0;
+      GtkTreeIter iter;
+      for (i = 0; i < len; i++) {
+        if (col == 0)
+          gtk_list_store_append(list, &iter);
+        gtk_list_store_set(list, &iter, col++, items[i], -1);
+        if (col == ncols)
+          col = 0; // new row
+      }
+#elif NCURSES
+      // TODO:
+#endif
     }
-    for (i = 3; i > 0; i--)
-      if (buttons[i - 1])
-        gtk_dialog_add_button(GTK_DIALOG(dialog), buttons[i - 1], i);
-    gtk_dialog_set_default_response(GTK_DIALOG(dialog), 1);
+  } else {
+    if (type == GCDIALOG_FILESELECT) {
+#if GTK
+      dialog = gtk_file_chooser_dialog_new(title, NULL,
+                                           GTK_FILE_CHOOSER_ACTION_OPEN,
+                                           GTK_STOCK_CANCEL,
+                                           GTK_RESPONSE_CANCEL, GTK_STOCK_OPEN,
+                                           GTK_RESPONSE_ACCEPT, NULL);
+      if (only_dirs)
+          gtk_file_chooser_set_action(GTK_FILE_CHOOSER(dialog),
+                                      GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
+#elif NCURSES
+      dialog = initCDKScreen(newwin(height, width, 0, 0));
+      fileselect = newCDKFselect(dialog, LEFT, TOP, 0, 0, (char *)title,
+                                 (char *)text, A_NORMAL, '_', A_REVERSE, "</B>",
+                                 "</N>", "</N>", "</N>", TRUE, FALSE);
+#endif
+    } else {
+#if GTK
+      dialog = gtk_file_chooser_dialog_new(title, NULL,
+                                           GTK_FILE_CHOOSER_ACTION_SAVE,
+                                           GTK_STOCK_CANCEL,
+                                           GTK_RESPONSE_CANCEL, GTK_STOCK_SAVE,
+                                           GTK_RESPONSE_ACCEPT, NULL);
+      gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog),
+                                                     TRUE);
+#elif NCURSES
+      dialog = initCDKScreen(newwin(height, width, 0, 0));
+      fileselect = newCDKFselect(dialog, LEFT, TOP, 0, 0, (char *)title,
+                                 (char *)text, A_NORMAL, '_', A_REVERSE, "</B>",
+                                 "</N>", "</N>", "</N>", TRUE, FALSE);
+#endif
+    }
+#if GTK
+    gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), multiple);
+    if (dir)
+      gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), dir);
+    if (filter)
+      gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
+    if (file)
+      gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), file);
+#elif NCURSES
+    if (dir)
+      setCDKFselectDirectory(fileselect, (char *)dir);
+    if (file) {
+      char *dir = dirName((char *)file);
+      setCDKFselectDirectory(fileselect, (char *)dir);
+      // TODO: select file in the list.
+      free(dir);
+    }
+#endif
+  }
+#if GTK
+  gtk_window_set_wmclass(GTK_WINDOW(dialog), "gcocoadialog", "gcocoadialog");
+#endif
+
+  // Run dialog; text output is stored in 'out'
+  if (type != GCDIALOG_FILESELECT && type != GCDIALOG_FILESAVE &&
+      type != GCDIALOG_PROGRESSBAR) {
+#if GTK
     gtk_widget_show_all(dialog);
-    if (strlen(gtk_label_get_text(GTK_LABEL(text))) == 0) gtk_widget_hide(text);
-    if (strlen(gtk_label_get_text(GTK_LABEL(info_text))) == 0)
-      gtk_widget_hide(info_text);
-    if (timeout) g_timeout_add_seconds(timeout, timeout_dialog, NULL);
+    if (timeout)
+      g_timeout_add_seconds(timeout, timeout_dialog, (gpointer)dialog);
     int response = gtk_dialog_run(GTK_DIALOG(dialog));
-    if (response == -4) response = RESPONSE_DELETE;
+    if (response == -4)
+      response = RESPONSE_DELETE;
+#elif NCURSES
+    WINDOW *border = newwin(height, width, 0, 0);
+    box(border, 0, 0);
+    wrefresh(border), refreshCDKScreen(dialog);
+    int response;
+    if (type >= GCDIALOG_INPUTBOX &&
+        type <= GCDIALOG_SECURE_STANDARD_INPUTBOX) {
+      activateCDKEntry(entry, NULL);
+      response = (entry->exitType == vNORMAL) ? 1 + buttonbox->currentButton
+                                              : RESPONSE_DELETE;
+    } else if (type == GCDIALOG_TEXTBOX && focus_textbox) {
+      activateCDKMentry(textview, NULL);
+      response = (textview->exitType == vNORMAL) ? 1 + buttonbox->currentButton
+                                                 : RESPONSE_DELETE;
+    } else if (type == GCDIALOG_DROPDOWN ||
+               type == GCDIALOG_STANDARD_DROPDOWN) {
+      activateCDKItemlist(combobox, NULL);
+      response = (combobox->exitType == vNORMAL) ? 1 + buttonbox->currentButton
+                                                 : RESPONSE_DELETE;
+    } else {
+      response = 1 + activateCDKButtonbox(buttonbox, NULL);
+      if (response == 0) // activateCDKButtonbox returns -1 on escape
+        response = RESPONSE_DELETE;
+    }
+    delwin(border);
+#endif
     if (string_output && response > 0 && response <= 3) {
       int len = strlen(buttons[response - 1]);
       out = malloc(len + 1);
@@ -562,8 +772,15 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
         char *txt;
         int created = 0;
         if (type <= GCDIALOG_SECURE_STANDARD_INPUTBOX) {
+#if GTK
           txt = (char *)gtk_entry_get_text(GTK_ENTRY(entry));
+#elif NCURSES
+          txt = getCDKEntryValue(entry);
+#endif
         } else if (type == GCDIALOG_TEXTBOX) {
+#if GTK
+          GtkTextBuffer *buffer =
+            gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview));
           GtkTextIter s, e;
           gtk_text_buffer_get_start_iter(buffer, &s);
           gtk_text_buffer_get_end_iter(buffer, &e);
@@ -572,20 +789,29 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
             gtk_widget_modify_font(textview, NULL);
             pango_font_description_free(font);
           }
+#elif NCURSES
+          txt = getCDKMentryValue(textview);
+#endif
         } else if (type == GCDIALOG_DROPDOWN ||
                    type == GCDIALOG_STANDARD_DROPDOWN) {
           if (string_output) {
-#if GTK_CHECK_VERSION(3,0,0)
-            txt = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(combobox));
-#else
+#if GTK
             txt = gtk_combo_box_get_active_text(GTK_COMBO_BOX(combobox));
+#elif NCURSES
+            txt = (char *)items[getCDKItemlistCurrentItem(combobox)];
 #endif
           } else {
             txt = malloc(4);
-            sprintf(txt, "%i", gtk_combo_box_get_active(GTK_COMBO_BOX(combobox)));
+            sprintf(txt, "%i",
+#if GTK
+                    gtk_combo_box_get_active(GTK_COMBO_BOX(combobox)));
+#elif NCURSES
+                    getCDKItemlistCurrentItem(combobox));
+#endif
             created = 1;
           }
         } else if (type == GCDIALOG_FILTEREDLIST) {
+#if GTK
           GString *gstr = g_string_new("");
           gtk_tree_selection_selected_foreach(
             gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview)), list_foreach,
@@ -595,6 +821,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
             txt[strlen(txt) - 1] = '\0'; // chomp '\n'
           g_string_free(gstr, TRUE);
           created = 1;
+#endif
         }
         char *new_out = malloc(strlen(out) + strlen(txt) + 2);
         sprintf(new_out, "%s\n%s", out, txt);
@@ -604,12 +831,14 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       }
     }
   } else if (type == GCDIALOG_FILESELECT || type ==  GCDIALOG_FILESAVE) {
+#if GTK
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
       if (type == GCDIALOG_FILESELECT &&
           gtk_file_chooser_get_select_multiple(GTK_FILE_CHOOSER(dialog))) {
         out = malloc(1);
         *out = '\0';
-        GSList *filenames = gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(dialog));
+        GSList *filenames =
+          gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(dialog));
         GSList *item = filenames;
         while (item) {
           char *data = (char *)item->data;
@@ -632,9 +861,23 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       out = malloc(1);
       *out = '\0';
     }
+#elif NCURSES
+    char *text = activateCDKFselect(fileselect, NULL);
+    if (text) {
+      int len = strlen(text);
+      out = malloc(len + 1);
+      strncpy(out, text, len);
+      out[len] = '\0';
+    } else {
+      out = malloc(1);
+      *out = '\0';
+    }
+#endif
   } else if (type == GCDIALOG_PROGRESSBAR) {
+#if GTK
     gtk_widget_show_all(GTK_WIDGET(dialog));
     // TODO: read from stdin and update progressbar
+#endif
   }
   if (strcmp(out, "0") == 0 && string_output) {
     out = malloc(8);
@@ -643,7 +886,13 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
     out = malloc(7);
     sprintf(out, "delete");
   }
+#if GTK
   gtk_widget_destroy(dialog);
+#elif NCURSES
+  delwin(dialog->window);
+  destroyCDKScreenObjects(dialog);
+  destroyCDKScreen(dialog);
+#endif
   if (!no_newline) {
     char *new_out = malloc(strlen(out) + 2);
     sprintf(new_out, "%s\n", out);
@@ -1245,10 +1494,17 @@ int main(int argc, char *argv[]) {
   if (argc == 1 || strcmp(argv[1], "help") == 0)
     return error(argc, argv);
   int type = gcocoadialog_type(argv[1]);
-  gtk_init(&argc, &argv);
   if (type < 0)
     return error(argc, argv);
-  char *out = gcocoadialog(type, argc - 1, &argv[2]);
+#if GTK
+  gtk_init(&argc, &argv);
+#elif NCURSES
+  initscr();
+#endif
+  char *out = gcocoadialog(type, argc - 2, (const char **)&argv[2]);
+#if NCURSES
+  endCDK();
+#endif
   printf(out);
   free(out);
   return 0;
