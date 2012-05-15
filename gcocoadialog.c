@@ -462,7 +462,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
     gtk_widget_set_size_request(GTK_WIDGET(dialog), width, height);
 #elif NCURSES
     // There will be a border drawn later, but account for it now.
-    dialog = initCDKScreen(newwin(height - 2, width - 2, 1, 1));
+    dialog = initCDKScreen(newwin(height - 2, width - 2, 2, 2));
 #endif
     // Create buttons.
     if (type != GCDIALOG_PROGRESSBAR) {
@@ -732,9 +732,9 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
     if (response == -4)
       response = RESPONSE_DELETE;
 #elif NCURSES
-    WINDOW *border = newwin(height, width, 0, 0);
-    box(border, 0, 0);
-    wrefresh(border), refreshCDKScreen(dialog);
+    WINDOW *border = newwin(height, width, 1, 1);
+    box(border, 0, 0), wrefresh(border);
+    refreshCDKScreen(dialog);
     int response;
     if (type >= GCDIALOG_INPUTBOX &&
         type <= GCDIALOG_SECURE_STANDARD_INPUTBOX) {
@@ -755,7 +755,9 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       if (response == 0) // activateCDKButtonbox returns -1 on escape
         response = RESPONSE_DELETE;
     }
+    wborder(border, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '), wrefresh(border);
     delwin(border);
+    destroyCDKButtonbox(buttonbox);
 #endif
     if (string_output && response > 0 && response <= 3) {
       int len = strlen(buttons[response - 1]);
@@ -776,6 +778,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
           txt = (char *)gtk_entry_get_text(GTK_ENTRY(entry));
 #elif NCURSES
           txt = getCDKEntryValue(entry);
+          destroyCDKEntry(entry);
 #endif
         } else if (type == GCDIALOG_TEXTBOX) {
 #if GTK
@@ -791,6 +794,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
           }
 #elif NCURSES
           txt = getCDKMentryValue(textview);
+          destroyCDKMentry(textview);
 #endif
         } else if (type == GCDIALOG_DROPDOWN ||
                    type == GCDIALOG_STANDARD_DROPDOWN) {
@@ -799,6 +803,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
             txt = gtk_combo_box_get_active_text(GTK_COMBO_BOX(combobox));
 #elif NCURSES
             txt = (char *)items[getCDKItemlistCurrentItem(combobox)];
+            destroyCDKItemlist(combobox);
 #endif
           } else {
             txt = malloc(4);
@@ -807,6 +812,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
                     gtk_combo_box_get_active(GTK_COMBO_BOX(combobox)));
 #elif NCURSES
                     getCDKItemlistCurrentItem(combobox));
+            destroyCDKItemlist(combobox);
 #endif
             created = 1;
           }
@@ -872,6 +878,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       out = malloc(1);
       *out = '\0';
     }
+    destroyCDKFselect(fileselect);
 #endif
   } else if (type == GCDIALOG_PROGRESSBAR) {
 #if GTK
@@ -890,7 +897,6 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
   gtk_widget_destroy(dialog);
 #elif NCURSES
   delwin(dialog->window);
-  destroyCDKScreenObjects(dialog);
   destroyCDKScreen(dialog);
 #endif
   if (!no_newline) {
