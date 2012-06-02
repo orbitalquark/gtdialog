@@ -8,15 +8,15 @@ FLAGS = -DNCURSES
 LIBS = -lncursesw -lcdk
 endif
 
-all:gcocoadialog
-gcocoadialog.o: gcocoadialog.c
+all: gtdialog
+gtdialog.o: gtdialog.c
 	gcc -g $(FLAGS) -c $< -o $@
-gcocoadialog: gcocoadialog.o
+gtdialog: gtdialog.o
 	gcc -g $(FLAGS) $< -o $@ $(LIBS)
 clean:
-	rm gcocoadialog gcocoadialog.o
+	rm gtdialog gtdialog.o
 
 manual: doc/*.md *.md
-	doc/bombay -d doc -t doc --title GCocoaDialog --navtitle Manual $^
+	doc/bombay -d doc -t doc --title gtDialog --navtitle Manual $^
 cleandoc:
 	rm -f doc/*.html

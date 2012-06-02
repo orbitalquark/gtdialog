@@ -1,8 +1,8 @@
-# GCocoaDialog
+# gtDialog
 
 ## Overview
 
-GCocoaDialog is a cross-platform [cocoaDialog][] clone written in C using
+gtDialog is a cross-platform [cocoaDialog][] clone written in C using
 [GTK+ 2.0][] or [ncurses][]. You can use it as either a command-line program for
 shell scripts or C library for applications to easily create interactive dialogs
 for file selection, text input, yes/no confirmations, lists and more.
@@ -27,22 +27,22 @@ for file selection, text input, yes/no confirmations, lists and more.
 
 ## Requirements
 
-GCocoaDialog only requires GTK+ version 2.16 or higher or ncurses and [CDK][].
+gtDialog only requires GTK+ version 2.16 or higher or ncurses and [CDK][].
 
 [CDK]: http://invisible-island.net/cdk/
 
 ## Download
 
-Download GCocoaDialog from the [project page][].
+Download gtDialog from the [project page][].
 
-[project page]: http://foicica.com/gcocoadialog
+[project page]: http://foicica.com/gtdialog
 
 ## Installation and Usage
 
-GCocoaDialog comes with a manual and API documentation in the `doc/` directory.
+gtDialog comes with a manual and API documentation in the `doc/` directory.
 They are also available [online][].
 
-[online]: http://foicica.com/gcocoadialog
+[online]: http://foicica.com/gtdialog
 
 ## Contact
 
@@ -55,7 +55,7 @@ There is also a [mailing list][].
 ## Donate
 
 Your donations are very much appreciated and go towards web server maintainence
-and hosting for GCocoaDialog, its source code repository, mailing list, etc.
+and hosting for gtDialog, its source code repository, mailing list, etc.
 
 <form action="https://www.paypal.com/cgi-bin/webscr" method="post">
 <input type="hidden" name="cmd" value="_s-xclick">

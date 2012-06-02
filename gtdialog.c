@@ -34,7 +34,7 @@
 #include <cdk/cdk.h>
 #endif
 
-#include "gcocoadialog.h"
+#include "gtdialog.h"
 
 // Default variables.
 int string_output = 0;
@@ -60,35 +60,35 @@ int output_col = 0, search_col = 0;
 #endif
 #endif
 
-GCDialogType gcocoadialog_type(const char *type) {
+GTDialogType gtdialog_type(const char *type) {
   if (strcmp(type, "msgbox") == 0)
-    return GCDIALOG_MSGBOX;
+    return GTDIALOG_MSGBOX;
   else if (strcmp(type, "ok-msgbox") == 0)
-    return GCDIALOG_OK_MSGBOX;
+    return GTDIALOG_OK_MSGBOX;
   else if (strcmp(type, "yesno-msgbox") == 0)
-    return GCDIALOG_YESNO_MSGBOX;
+    return GTDIALOG_YESNO_MSGBOX;
   else if (strcmp(type, "inputbox") == 0)
-    return GCDIALOG_INPUTBOX;
+    return GTDIALOG_INPUTBOX;
   else if (strcmp(type, "standard-inputbox") == 0)
-    return GCDIALOG_STANDARD_INPUTBOX;
+    return GTDIALOG_STANDARD_INPUTBOX;
   else if (strcmp(type, "secure-inputbox") == 0)
-    return GCDIALOG_SECURE_INPUTBOX;
+    return GTDIALOG_SECURE_INPUTBOX;
   else if (strcmp(type, "secure-standard-inputbox") == 0)
-    return GCDIALOG_SECURE_STANDARD_INPUTBOX;
+    return GTDIALOG_SECURE_STANDARD_INPUTBOX;
   else if (strcmp(type, "fileselect") == 0)
-    return GCDIALOG_FILESELECT;
+    return GTDIALOG_FILESELECT;
   else if (strcmp(type, "filesave") == 0)
-    return GCDIALOG_FILESAVE;
+    return GTDIALOG_FILESAVE;
   else if (strcmp(type, "textbox") == 0)
-    return GCDIALOG_TEXTBOX;
+    return GTDIALOG_TEXTBOX;
   else if (strcmp(type, "progressbar") == 0)
-    return GCDIALOG_PROGRESSBAR;
+    return GTDIALOG_PROGRESSBAR;
   else if (strcmp(type, "dropdown") == 0)
-    return GCDIALOG_DROPDOWN;
+    return GTDIALOG_DROPDOWN;
   else if (strcmp(type, "standard-dropdown") == 0)
-    return GCDIALOG_STANDARD_DROPDOWN;
+    return GTDIALOG_STANDARD_DROPDOWN;
   else if (strcmp(type, "filteredlist") == 0)
-    return GCDIALOG_FILTEREDLIST;
+    return GTDIALOG_FILTEREDLIST;
   return -1;
 }
 
@@ -199,13 +199,13 @@ static int buttonbox_tab(EObjectType cdkType, void *object, void *data,
 }
 #endif
 
-char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
+char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   int RESPONSE_DELETE = -1; // timeout is 0
   char *out = NULL;
 
   // Default variables.
   int height = -1, floating = 0, no_newline = 0, timeout = 0, width = -1;
-  const char *title = "gcocoadialog";
+  const char *title = "gtdialog";
   string_output = 0;
 
   // Dialog-specific variables.
@@ -227,26 +227,26 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
   width = 40;
   height = 10;
 #endif
-  if (type == GCDIALOG_MSGBOX) {
+  if (type == GTDIALOG_MSGBOX) {
     buttons[0] = STR_OK;
-  } else if (type == GCDIALOG_OK_MSGBOX) {
+  } else if (type == GTDIALOG_OK_MSGBOX) {
     buttons[0] = STR_OK;
     buttons[1] = STR_CANCEL;
-  } else if (type == GCDIALOG_YESNO_MSGBOX) {
+  } else if (type == GTDIALOG_YESNO_MSGBOX) {
     buttons[0] = STR_YES;
     buttons[1] = STR_NO;
     buttons[2] = STR_CANCEL;
-  } else if (type >= GCDIALOG_INPUTBOX &&
-             type <= GCDIALOG_SECURE_STANDARD_INPUTBOX) {
+  } else if (type >= GTDIALOG_INPUTBOX &&
+             type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
     buttons[0] = STR_OK;
-    if (type == GCDIALOG_STANDARD_INPUTBOX ||
-        type == GCDIALOG_SECURE_STANDARD_INPUTBOX)
+    if (type == GTDIALOG_STANDARD_INPUTBOX ||
+        type == GTDIALOG_SECURE_STANDARD_INPUTBOX)
       buttons[1] = STR_CANCEL;
-  } else if (type == GCDIALOG_FILESELECT || type == GCDIALOG_FILESAVE) {
+  } else if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE) {
 #if NCURSES
     height = 20;
 #endif
-  } else if (type == GCDIALOG_TEXTBOX) {
+  } else if (type == GTDIALOG_TEXTBOX) {
 #if GTK
     width = 400;
     height = 300;
@@ -254,11 +254,11 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
     height = 20;
 #endif
     buttons[0] = STR_OK;
-  } else if (type == GCDIALOG_DROPDOWN || type == GCDIALOG_STANDARD_DROPDOWN) {
+  } else if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN) {
     buttons[0] = STR_OK;
-    if (type == GCDIALOG_STANDARD_DROPDOWN)
+    if (type == GTDIALOG_STANDARD_DROPDOWN)
       buttons[1] = STR_CANCEL;
-  } else if (type == GCDIALOG_FILTEREDLIST) {
+  } else if (type == GTDIALOG_FILTEREDLIST) {
 #if GTK
     width = 500;
     height = 360;
@@ -292,52 +292,52 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
         width = w;
     // Dialog-specific options
     } else if (strcmp(arg, "--button1") == 0) {
-      if (type == GCDIALOG_MSGBOX || type == GCDIALOG_INPUTBOX ||
-          type == GCDIALOG_TEXTBOX || type == GCDIALOG_DROPDOWN ||
-          type == GCDIALOG_FILTEREDLIST)
+      if (type == GTDIALOG_MSGBOX || type == GTDIALOG_INPUTBOX ||
+          type == GTDIALOG_TEXTBOX || type == GTDIALOG_DROPDOWN ||
+          type == GTDIALOG_FILTEREDLIST)
         buttons[0] = args[i++];
     } else if (strcmp(arg, "--button2") == 0) {
-      if (type == GCDIALOG_MSGBOX || type == GCDIALOG_INPUTBOX ||
-          type == GCDIALOG_TEXTBOX || type == GCDIALOG_DROPDOWN ||
-          type == GCDIALOG_FILTEREDLIST)
+      if (type == GTDIALOG_MSGBOX || type == GTDIALOG_INPUTBOX ||
+          type == GTDIALOG_TEXTBOX || type == GTDIALOG_DROPDOWN ||
+          type == GTDIALOG_FILTEREDLIST)
         buttons[1] = args[i++];
     } else if (strcmp(arg, "--button3") == 0) {
-      if (type == GCDIALOG_MSGBOX || type == GCDIALOG_INPUTBOX ||
-          type == GCDIALOG_TEXTBOX || type == GCDIALOG_DROPDOWN ||
-          type == GCDIALOG_FILTEREDLIST)
+      if (type == GTDIALOG_MSGBOX || type == GTDIALOG_INPUTBOX ||
+          type == GTDIALOG_TEXTBOX || type == GTDIALOG_DROPDOWN ||
+          type == GTDIALOG_FILTEREDLIST)
         buttons[2] = args[i++];
     } else if (strcmp(arg, "--columns") == 0) {
-      if (type == GCDIALOG_FILTEREDLIST) {
+      if (type == GTDIALOG_FILTEREDLIST) {
         cols = &args[i];
         ncols = 0;
         while (i < narg && strncmp(args[i], "--", 2) != 0)
           ncols++, i++;
       }
     } else if (strcmp(arg, "--editable") == 0) {
-      if (type == GCDIALOG_TEXTBOX)
+      if (type == GTDIALOG_TEXTBOX)
         editable = 1;
     } else if (strcmp(arg, "--exit-onchange") == 0) {
-      if (type == GCDIALOG_DROPDOWN || type == GCDIALOG_STANDARD_DROPDOWN)
+      if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN)
         exit_onchange = 1;
     } else if (strcmp(arg, "--float") == 0) {
-      if (type != GCDIALOG_FILESELECT && type != GCDIALOG_FILESAVE &&
-          type != GCDIALOG_PROGRESSBAR)
+      if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
+          type != GTDIALOG_PROGRESSBAR)
         floating = 1;
     } else if (strcmp(arg, "--focus-textbox") == 0) {
-      if (type == GCDIALOG_TEXTBOX)
+      if (type == GTDIALOG_TEXTBOX)
         focus_textbox = 1;
      } else if (strcmp(arg, "--icon") == 0) {
-      //if (type >= GCDIALOG_MSGBOX && type <= GCDIALOG_YESNO_MSGBOX)
+      //if (type >= GTDIALOG_MSGBOX && type <= GTDIALOG_YESNO_MSGBOX)
         // not implemented
     } else if (strcmp(arg, "--icon-file") == 0) {
-      //if (type >= GCDIALOG_MSGBOX && type <= GCDIALOG_YESNO_MSGBOX)
+      //if (type >= GTDIALOG_MSGBOX && type <= GTDIALOG_YESNO_MSGBOX)
         // not implemented
     } else if (strcmp(arg, "--indeterminate") == 0) {
-      if (type == GCDIALOG_PROGRESSBAR)
+      if (type == GTDIALOG_PROGRESSBAR)
         indeterminate = 1;
     } else if (strcmp(arg, "--informative-text") == 0) {
-      if (type < GCDIALOG_FILESELECT || type == GCDIALOG_TEXTBOX ||
-          type == GCDIALOG_FILTEREDLIST)
+      if (type < GTDIALOG_FILESELECT || type == GTDIALOG_TEXTBOX ||
+          type == GTDIALOG_FILTEREDLIST)
         info_text = args[i++];
     } else if (strcmp(arg, "--items") == 0) {
       items = &args[i];
@@ -346,78 +346,78 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
         len++, i++;
     } else if (strcmp(arg, "--monospaced-font") == 0) {
 #if GTK
-      if (type == GCDIALOG_TEXTBOX) {
+      if (type == GTDIALOG_TEXTBOX) {
         font = pango_font_description_new();
         pango_font_description_set_family(font, "monospace");
       }
 #endif
     } else if (strcmp(arg, "--no-cancel") == 0) {
-      if (type == GCDIALOG_YESNO_MSGBOX) {
+      if (type == GTDIALOG_YESNO_MSGBOX) {
         buttons[2] = NULL;
-      } else if (type == GCDIALOG_OK_MSGBOX ||
-                 type == GCDIALOG_STANDARD_INPUTBOX ||
-                 type == GCDIALOG_SECURE_STANDARD_INPUTBOX ||
-                 type == GCDIALOG_STANDARD_DROPDOWN) {
+      } else if (type == GTDIALOG_OK_MSGBOX ||
+                 type == GTDIALOG_STANDARD_INPUTBOX ||
+                 type == GTDIALOG_SECURE_STANDARD_INPUTBOX ||
+                 type == GTDIALOG_STANDARD_DROPDOWN) {
         buttons[1] = NULL;
       }
     } else if (strcmp(arg, "--no-create-directories") == 0) {
-      //if (type == GCDIALOG_FILESAVE)
+      //if (type == GTDIALOG_FILESAVE)
         // not implemented
    } else if (strcmp(arg, "--no-show") == 0) {
-      if (type >= GCDIALOG_INPUTBOX &&
-          type <= GCDIALOG_SECURE_STANDARD_INPUTBOX)
+      if (type >= GTDIALOG_INPUTBOX &&
+          type <= GTDIALOG_SECURE_STANDARD_INPUTBOX)
         no_show = 1;
     } else if (strcmp(arg, "--output-column") == 0) {
-      if (type == GCDIALOG_FILTEREDLIST)
+      if (type == GTDIALOG_FILTEREDLIST)
         output_col = atoi(args[i++]);
     } else if (strcmp(arg, "--packages-as-directories") == 0) {
-      //if (type == GCDIALOG_FILESELECT || type == GCDIALOG_FILESAVE)
+      //if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
         // not implemented
     } else if (strcmp(arg, "--percent") == 0) {
-      if (type == GCDIALOG_PROGRESSBAR)
+      if (type == GTDIALOG_PROGRESSBAR)
         percent = atoi(args[i++]);
     } else if (strcmp(arg, "--pulldown") == 0) {
-      //if (type == GCDIALOG_DROPDOWN || type == GCDIALOG_STANDARD_DROPDOWN)
+      //if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN)
         // not implemented
     } else if (strcmp(arg, "--scroll-to") == 0) {
-      if (type == GCDIALOG_TEXTBOX) {
+      if (type == GTDIALOG_TEXTBOX) {
         focus_textbox = 1;
         scroll_to = args[i++];
       }
     } else if (strcmp(arg, "--search-column") == 0) {
-      if (type == GCDIALOG_FILTEREDLIST) {
+      if (type == GTDIALOG_FILTEREDLIST) {
         search_col = atoi(args[i++]);
         if (search_col >= ncols)
           search_col = ncols - 1;
       }
     } else if (strcmp(arg, "--select-directories") == 0) {
-      //if (type == GCDIALOG_FILESELECT)
+      //if (type == GTDIALOG_FILESELECT)
         // not implemented
     } else if (strcmp(arg, "--select-multiple") == 0) {
-      if (type == GCDIALOG_FILESELECT || type == GCDIALOG_FILTEREDLIST)
+      if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILTEREDLIST)
         multiple = 1;
     } else if (strcmp(arg, "--select-only-directories") == 0) {
-      if (type == GCDIALOG_FILESELECT)
+      if (type == GTDIALOG_FILESELECT)
         only_dirs = 1;
     } else if (strcmp(arg, "--selected") == 0) {
-      if (type == GCDIALOG_TEXTBOX)
+      if (type == GTDIALOG_TEXTBOX)
         selected = 1;
-      else if (type == GCDIALOG_DROPDOWN || type == GCDIALOG_STANDARD_DROPDOWN)
+      else if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN)
         selected = atoi(args[i++]);
     } else if (strcmp(arg, "--text") == 0) {
         text = args[i++];
     } else if (strcmp(arg, "--text-from-file") == 0) {
-      if (type == GCDIALOG_TEXTBOX)
+      if (type == GTDIALOG_TEXTBOX)
         file = args[i++];
     } else if (strcmp(arg, "--timeout") == 0) {
-      if (type != GCDIALOG_FILESELECT && type != GCDIALOG_FILESAVE &&
-          type != GCDIALOG_PROGRESSBAR)
+      if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
+          type != GTDIALOG_PROGRESSBAR)
         timeout = atoi(args[i++]);
     } else if (strcmp(arg, "--with-directory") == 0) {
-      if (type == GCDIALOG_FILESELECT || type == GCDIALOG_FILESAVE)
+      if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
         dir = args[i++];
     } else if (strcmp(arg, "--with-extension") == 0) {
-      if (type == GCDIALOG_FILESELECT || type == GCDIALOG_FILESAVE) {
+      if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE) {
 #if GTK
         filter = gtk_file_filter_new();
 #endif
@@ -434,7 +434,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
         arg = ext;
       }
     } else if (strcmp(arg, "--with-file") == 0) {
-      if (type == GCDIALOG_FILESELECT || type == GCDIALOG_FILESAVE)
+      if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
         file = args[i++];
     }
     if (get_next_arg) arg = args[i++];
@@ -453,7 +453,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
   CDKBUTTONBOX *buttonbox;
   CDKFSELECT *fileselect;
 #endif
-  if (type != GCDIALOG_FILESELECT && type != GCDIALOG_FILESAVE) {
+  if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE) {
 #if GTK
     dialog = gtk_dialog_new();
     gtk_window_set_title(GTK_WINDOW(dialog), title);
@@ -465,7 +465,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
     dialog = initCDKScreen(newwin(height - 2, width - 2, 2, 2));
 #endif
     // Create buttons.
-    if (type != GCDIALOG_PROGRESSBAR) {
+    if (type != GTDIALOG_PROGRESSBAR) {
 #if GTK
       for (i = 3; i > 0; i--)
         if (buttons[i - 1])
@@ -491,7 +491,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       gtk_box_pack_start(GTK_BOX(vbox), gtk_label_new(info_text), FALSE, TRUE,
                          5);
 #endif
-    if (type <= GCDIALOG_YESNO_MSGBOX) {
+    if (type <= GTDIALOG_YESNO_MSGBOX) {
 #if NCURSES
       char **lines;
       int nlines;
@@ -506,19 +506,19 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
         free(lines);
       }
 #endif
-    } else if (type >= GCDIALOG_INPUTBOX &&
-               type <= GCDIALOG_SECURE_STANDARD_INPUTBOX) {
+    } else if (type >= GTDIALOG_INPUTBOX &&
+               type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
 #if GTK
       entry = gtk_entry_new();
       gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
       gtk_box_pack_start(GTK_BOX(vbox), entry, FALSE, TRUE, 5);
-      if (type >= GCDIALOG_SECURE_INPUTBOX || no_show)
+      if (type >= GTDIALOG_SECURE_INPUTBOX || no_show)
         gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
       if (text)
         gtk_entry_set_text(GTK_ENTRY(entry), text);
 #elif NCURSES
       EDisplayType display = vMIXED;
-      if (type >= GCDIALOG_SECURE_INPUTBOX || no_show)
+      if (type >= GTDIALOG_SECURE_INPUTBOX || no_show)
         display = vHMIXED;
       entry = newCDKEntry(dialog, LEFT, TOP, (char *)title, (char *)info_text,
                           A_NORMAL, '_', display, 0, 0, 100, FALSE, FALSE);
@@ -527,7 +527,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       if (text)
         setCDKEntryValue(entry, (char *)text);
 #endif
-    } else if (type == GCDIALOG_TEXTBOX) {
+    } else if (type == GTDIALOG_TEXTBOX) {
 #if GTK
       textview = gtk_text_view_new();
       gtk_text_view_set_editable(GTK_TEXT_VIEW(textview), editable);
@@ -585,7 +585,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       else
         injectCDKMentry(textview, KEY_END);
 #endif
-    } else if (type == GCDIALOG_PROGRESSBAR) {
+    } else if (type == GTDIALOG_PROGRESSBAR) {
 #if GTK
       progressbar = gtk_progress_bar_new();
       gtk_box_pack_start(GTK_BOX(vbox), progressbar, FALSE, TRUE, 5);
@@ -596,8 +596,8 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
         gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), text);
 #elif NCURSES
 #endif
-    } else if (type == GCDIALOG_DROPDOWN ||
-               type == GCDIALOG_STANDARD_DROPDOWN) {
+    } else if (type == GTDIALOG_DROPDOWN ||
+               type == GTDIALOG_STANDARD_DROPDOWN) {
 #if GTK
       combobox = gtk_combo_box_text_new();
       combobox = gtk_combo_box_new_text();
@@ -613,7 +613,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
                                 (char *)info_text, (char **)items, len, 0,
                                 FALSE, FALSE);
 #endif
-    } else if (type == GCDIALOG_FILTEREDLIST) {
+    } else if (type == GTDIALOG_FILTEREDLIST) {
 #if GTK
       entry = gtk_entry_new();
       gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
@@ -666,7 +666,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
 #endif
     }
   } else {
-    if (type == GCDIALOG_FILESELECT) {
+    if (type == GTDIALOG_FILESELECT) {
 #if GTK
       dialog = gtk_file_chooser_dialog_new(title, NULL,
                                            GTK_FILE_CHOOSER_ACTION_OPEN,
@@ -718,12 +718,12 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
 #endif
   }
 #if GTK
-  gtk_window_set_wmclass(GTK_WINDOW(dialog), "gcocoadialog", "gcocoadialog");
+  gtk_window_set_wmclass(GTK_WINDOW(dialog), "gtdialog", "gtdialog");
 #endif
 
   // Run dialog; text output is stored in 'out'
-  if (type != GCDIALOG_FILESELECT && type != GCDIALOG_FILESAVE &&
-      type != GCDIALOG_PROGRESSBAR) {
+  if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
+      type != GTDIALOG_PROGRESSBAR) {
 #if GTK
     gtk_widget_show_all(dialog);
     if (timeout)
@@ -736,17 +736,17 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
     box(border, 0, 0), wrefresh(border);
     refreshCDKScreen(dialog);
     int response;
-    if (type >= GCDIALOG_INPUTBOX &&
-        type <= GCDIALOG_SECURE_STANDARD_INPUTBOX) {
+    if (type >= GTDIALOG_INPUTBOX &&
+        type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
       activateCDKEntry(entry, NULL);
       response = (entry->exitType == vNORMAL) ? 1 + buttonbox->currentButton
                                               : RESPONSE_DELETE;
-    } else if (type == GCDIALOG_TEXTBOX && focus_textbox) {
+    } else if (type == GTDIALOG_TEXTBOX && focus_textbox) {
       activateCDKMentry(textview, NULL);
       response = (textview->exitType == vNORMAL) ? 1 + buttonbox->currentButton
                                                  : RESPONSE_DELETE;
-    } else if (type == GCDIALOG_DROPDOWN ||
-               type == GCDIALOG_STANDARD_DROPDOWN) {
+    } else if (type == GTDIALOG_DROPDOWN ||
+               type == GTDIALOG_STANDARD_DROPDOWN) {
       activateCDKItemlist(combobox, NULL);
       response = (combobox->exitType == vNORMAL) ? 1 + buttonbox->currentButton
                                                  : RESPONSE_DELETE;
@@ -768,19 +768,19 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
       out = malloc(3);
       sprintf(out, "%i", response);
     }
-    if (type >= GCDIALOG_INPUTBOX && type != GCDIALOG_FILESELECT &&
-        type != GCDIALOG_FILESAVE && type != GCDIALOG_PROGRESSBAR) {
+    if (type >= GTDIALOG_INPUTBOX && type != GTDIALOG_FILESELECT &&
+        type != GTDIALOG_FILESAVE && type != GTDIALOG_PROGRESSBAR) {
       if (response > 0) { // no delete or timeout
         char *txt;
         int created = 0;
-        if (type <= GCDIALOG_SECURE_STANDARD_INPUTBOX) {
+        if (type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
 #if GTK
           txt = (char *)gtk_entry_get_text(GTK_ENTRY(entry));
 #elif NCURSES
           txt = getCDKEntryValue(entry);
           destroyCDKEntry(entry);
 #endif
-        } else if (type == GCDIALOG_TEXTBOX) {
+        } else if (type == GTDIALOG_TEXTBOX) {
 #if GTK
           GtkTextBuffer *buffer =
             gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview));
@@ -796,8 +796,8 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
           txt = getCDKMentryValue(textview);
           destroyCDKMentry(textview);
 #endif
-        } else if (type == GCDIALOG_DROPDOWN ||
-                   type == GCDIALOG_STANDARD_DROPDOWN) {
+        } else if (type == GTDIALOG_DROPDOWN ||
+                   type == GTDIALOG_STANDARD_DROPDOWN) {
           if (string_output) {
 #if GTK
             txt = gtk_combo_box_get_active_text(GTK_COMBO_BOX(combobox));
@@ -816,7 +816,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
 #endif
             created = 1;
           }
-        } else if (type == GCDIALOG_FILTEREDLIST) {
+        } else if (type == GTDIALOG_FILTEREDLIST) {
 #if GTK
           GString *gstr = g_string_new("");
           gtk_tree_selection_selected_foreach(
@@ -836,10 +836,10 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
         if (created) free(txt);
       }
     }
-  } else if (type == GCDIALOG_FILESELECT || type ==  GCDIALOG_FILESAVE) {
+  } else if (type == GTDIALOG_FILESELECT || type ==  GTDIALOG_FILESAVE) {
 #if GTK
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
-      if (type == GCDIALOG_FILESELECT &&
+      if (type == GTDIALOG_FILESELECT &&
           gtk_file_chooser_get_select_multiple(GTK_FILE_CHOOSER(dialog))) {
         out = malloc(1);
         *out = '\0';
@@ -880,7 +880,7 @@ char *gcocoadialog(GCDialogType type, int narg, const char *args[]) {
     }
     destroyCDKFselect(fileselect);
 #endif
-  } else if (type == GCDIALOG_PROGRESSBAR) {
+  } else if (type == GTDIALOG_PROGRESSBAR) {
 #if GTK
     gtk_widget_show_all(GTK_WIDGET(dialog));
     // TODO: read from stdin and update progressbar
@@ -912,12 +912,12 @@ int error(int argc, char *argv[]) {
 #ifndef NOHELP
   int type = -1;
   if (argc == 3)
-    type = gcocoadialog_type(argv[2]);
+    type = gtdialog_type(argv[2]);
   const char *msg = 0;
   switch (type) {
-  case GCDIALOG_MSGBOX:
+  case GTDIALOG_MSGBOX:
     msg =
-      "gcocoadialog msgbox [options]\n"
+      "gtdialog msgbox [options]\n"
       "\n"
       "This control provides a generic message box. It allows you to customize the\n"
       "labels of the buttons. At least one button (--button1) must be specified. If\n"
@@ -954,14 +954,14 @@ int error(int argc, char *argv[]) {
       "      --button2 label specified.\n"
       "\n"
       "Example:\n"
-      "  gcocoadialog msgbox --no-newline \\\n"
+      "  gtdialog msgbox --no-newline \\\n"
       "    --text \"What's your favorite OS?\" \\\n"
       "    --informative-text \"The 'Cancel' label auto-binds that button to esc\" \\\n"
       "    --button1 \"OS X\" --button2 \"GNU/LINUX\" --button3 \"Cancel\"\n";
     break;
-  case GCDIALOG_OK_MSGBOX:
+  case GTDIALOG_OK_MSGBOX:
     msg =
-      "gcocoadialog ok-msgbox [options]\n"
+      "gtdialog ok-msgbox [options]\n"
       "\n"
       "This control provides a standard Ok/Cancel message box.\n"
       "\n"
@@ -990,13 +990,13 @@ int error(int argc, char *argv[]) {
       "      user does not click a button. Does not time out by default.\n"
       "\n"
       "Example:\n"
-      "  gcocoadialog ok-msgbox --text \"We need to make sure you see this message\" \\\n"
+      "  gtdialog ok-msgbox --text \"We need to make sure you see this message\" \\\n"
       "    --informative-text \"(Yes, the message was to inform you about itself)\" \\\n"
       "    --no-newline --float\n";
     break;
-  case GCDIALOG_YESNO_MSGBOX:
+  case GTDIALOG_YESNO_MSGBOX:
     msg =
-      "gcocoadialog yesno-msgbox [options]\n"
+      "gtdialog yesno-msgbox [options]\n"
       "\n"
       "This control provides a standard Yes/No/Cancel message box.\n"
       "\n"
@@ -1025,13 +1025,13 @@ int error(int argc, char *argv[]) {
       "      user does not click a button. Does not time out by default.\n"
       "\n"
       "Example:\n"
-      "  gcocoadialog yesno-msgbox --no-cancel --string-output --no-newline \\\n"
+      "  gtdialog yesno-msgbox --no-cancel --string-output --no-newline \\\n"
       "    --text \"This is a simple first example\" \\\n"
       "    --informative-text \"We're just going to echo the string output\"\n";
     break;
-  case GCDIALOG_INPUTBOX:
+  case GTDIALOG_INPUTBOX:
     msg =
-      "gcocoadialog inputbox [options]\n"
+      "gtdialog inputbox [options]\n"
       "\n"
       "This control provides a one line input box and customizable buttons. At least\n"
       "one button (--button1) must be specified. If labels for the other buttons are\n"
@@ -1068,15 +1068,15 @@ int error(int argc, char *argv[]) {
       "      dots will be shown.\n"
       "\n"
       "Example:\n"
-      "  gcocoadialog inputbox --title \"Search\" --no-newline \\\n"
+      "  gtdialog inputbox --title \"Search\" --no-newline \\\n"
       "    --informative-text \"Enter your search term\" \\\n"
       "    --text \"foobar\" \\\n"
       "    --button1 \"Search\" --button2 \"Search all\" \\\n"
       "    --width 600\n";
     break;
-  case GCDIALOG_STANDARD_INPUTBOX:
+  case GTDIALOG_STANDARD_INPUTBOX:
     msg =
-      "gcocoadialog standard-inputbox [options]\n"
+      "gtdialog standard-inputbox [options]\n"
       "\n"
       "This control provides a standard input box with \"Ok\" and \"Cancel\" buttons.\n"
       "\n"
@@ -1104,26 +1104,26 @@ int error(int argc, char *argv[]) {
       "      dots will be shown.\n"
       "\n"
       "Example:\n"
-      "  gcocoadialog standard-inputbox --title \"Your Name\" --no-newline \\\n"
+      "  gtdialog standard-inputbox --title \"Your Name\" --no-newline \\\n"
       "    --informative \"Enter your name\"\n";
     break;
-  case GCDIALOG_SECURE_INPUTBOX:
+  case GTDIALOG_SECURE_INPUTBOX:
     msg =
-      "gcocoadialog secure-inputbox [options]\n"
+      "gtdialog secure-inputbox [options]\n"
       "\n"
       "This is an alias for running an inputbox with the --no-show option. All\n"
       "options available to inputbox are available to secure-inputbox.\n";
     break;
-  case GCDIALOG_SECURE_STANDARD_INPUTBOX:
+  case GTDIALOG_SECURE_STANDARD_INPUTBOX:
     msg =
-      "gcocoadialog secure-standard-inputbox [options]\n"
+      "gtdialog secure-standard-inputbox [options]\n"
       "\n"
       "This is an alias for running a standard-inputbox with the --no-show option. All\n"
       "options available to standard-inputbox are available to secure-standard-inputbox.\n";
     break;
-  case GCDIALOG_FILESELECT:
+  case GTDIALOG_FILESELECT:
     msg =
-      "gcocoadialog fileselect [options]\n"
+      "gtdialog fileselect [options]\n"
       "\n"
       "This control provides a file selection window.\n"
       "\n"
@@ -1148,7 +1148,7 @@ int error(int argc, char *argv[]) {
       "      Limit selectable files to ones with these extensions. list of extensions\n"
       "      should be space separated, and given as multiple arguments (ie: don't\n"
       "      double quote the list).\n"
-      "      Example: gcocoadialog fileselect --with-extensions .c .h .m .txt\n"
+      "      Example: gtdialog fileselect --with-extensions .c .h .m .txt\n"
       "      The period/dot at the start of each extension is optional.\n"
       "  --with-directory directory\n"
       "      Start the file select window in directory. The default value is up to the\n"
@@ -1160,14 +1160,14 @@ int error(int argc, char *argv[]) {
       "      be the filename of a file within the directory.\n"
       "\n"
       "Example:\n"
-      "  gcocoadialog fileselect \\\n"
+      "  gtdialog fileselect \\\n"
       "    --title \"This is a fileselect\" \\\n"
       "    --text \"Choose the source file for the main controller\" \\\n"
       "    --with-extensions .c .m .cpp\n";
     break;
-  case GCDIALOG_FILESAVE:
+  case GTDIALOG_FILESAVE:
     msg =
-      "gcocoadialog filesave [options]\n"
+      "gtdialog filesave [options]\n"
       "\n"
       "This control provides a file save window, which allows the user to select a\n"
       "file, or specify a new file.\n"
@@ -1190,7 +1190,7 @@ int error(int argc, char *argv[]) {
       "      Limit selectable files to ones with these extensions. list of extensions\n"
       "      should be space separated, and given as multiple arguments (ie: don't\n"
       "      double quote the list).\n"
-      "      Example: gcocoadialog filesave --with-extensions .c .h .m .txt\n"
+      "      Example: gtdialog filesave --with-extensions .c .h .m .txt\n"
       "      The period/dot at the start of each extension is optional.\n"
       "  --with-directory directory\n"
       "      Start the file select window in directory. The default value is up to the\n"
@@ -1201,9 +1201,9 @@ int error(int argc, char *argv[]) {
       "      file will be selected. This must be used with --with-directory. It should\n"
       "      be the filename of a file within the directory.\n";
     break;
-  case GCDIALOG_TEXTBOX:
+  case GTDIALOG_TEXTBOX:
     msg =
-      "gcocoadialog textbox [options]\n"
+      "gtdialog textbox [options]\n"
       "\n"
       "This is a text box with a large text area.\n"
       "\n"
@@ -1253,13 +1253,13 @@ int error(int argc, char *argv[]) {
       "      A monospaced font is used in the text box instead of a proportional one."
       "\n"
       "Example:\n"
-      "  gcocoadialog textbox --title \"License\" --no-newline \\\n"
+      "  gtdialog textbox --title \"License\" --no-newline \\\n"
       "    --informative-text \"Do you agree with the terms of this license?\" \\\n"
       "    --text-from-file COPYING --button1 gtk-ok --button2 gtk-cancel\n";
     break;
-  case GCDIALOG_PROGRESSBAR:
+  case GTDIALOG_PROGRESSBAR:
     msg =
-      "gcocoadialog progressbar [options]\n"
+      "gtdialog progressbar [options]\n"
       "\n"
       "The progress bar is a bit different, and slightly more complex than the other\n"
       "controls. It has no return value, but reads input on stdin. It will continue to\n"
@@ -1286,12 +1286,12 @@ int error(int argc, char *argv[]) {
       "      lack of better description). It does not indicate how far the operations\n"
       "      you're performing have progressed; it just shows that your\n"
       "      application/script is busy. You can still update the text of the label\n"
-      "      when writing to gcocoadialog's stdin - and it doesn't matter what\n"
-      "      percentage you feed it.\n";
+      "      when writing to gtdialog's stdin - and it doesn't matter what percentage\n"
+      "      you feed it.\n";
     break;
-  case GCDIALOG_DROPDOWN:
+  case GTDIALOG_DROPDOWN:
     msg =
-      "gcocoadialog dropdown [options]\n"
+      "gtdialog dropdown [options]\n"
       "\n"
       "This control provides a dropdown list of items to select from and customizable\n"
       "buttons. Values for the dropdown list must be provided. At least one button\n"
@@ -1317,14 +1317,14 @@ int error(int argc, char *argv[]) {
       "      box. list of values should be space separated, and given as multiple\n"
       "      arguments (ie: don't double quote the entire list. Provide it as you\n"
       "      would multiple arguments for any shell program).\n"
-      "      Example: gcocoadialog dropdown --text \"Favorite OS?\" --items \"GNU/Linux\"\n"
+      "      Example: gtdialog dropdown --text \"Favorite OS?\" --items \"GNU/Linux\"\n"
       "      \"OS X\" Windows Amiga \"TI 89\" --button1 gtk-ok\n"
       "  --pulldown\n"
       "      Sets the style to a pull-down box, which differs slightly from the\n"
       "      default pop-up style. The first item remains visible. This option\n"
       "      probably isn't very useful for a single-function dialog such as those\n"
-      "      gcocoadialog provides, but I've included it just in case it is. To see\n"
-      "      how their appearances differ, just try them both.\n"
+      "      gtdialog provides, but I've included it just in case it is. To see how\n"
+      "      their appearances differ, just try them both.\n"
       "  --button1\n"
       "      required. This is the right-most button.\n"
       "  --button2\n"
@@ -1347,14 +1347,14 @@ int error(int argc, char *argv[]) {
       "      user does not click a button. Does not time out by default.\n"
       "\n"
       "Example:\n"
-      "  gcocoadialog dropdown --title \"Preferred OS\" --no-newline \\\n"
+      "  gtdialog dropdown --title \"Preferred OS\" --no-newline \\\n"
       "    --text \"What is your favorite OS?\" \\\n"
       "    --items \"Mac OS X\" \"GNU/Linux\" \"Windows\" --button1 'That one!' \\\n"
       "    --button2 Nevermind\n";
     break;
-  case GCDIALOG_STANDARD_DROPDOWN:
+  case GTDIALOG_STANDARD_DROPDOWN:
     msg =
-      "gcocoadialog standard-dropdown [options]\n"
+      "gtdialog standard-dropdown [options]\n"
       "\n"
       "This control provides a dropdown list of items to select from and the standard\n"
       "\"Ok\" and \"Cancel\" buttons. Values for the dropdown list must be provided.\n"
@@ -1375,14 +1375,14 @@ int error(int argc, char *argv[]) {
       "      box. list of values should be space separated, and given as multiple\n"
       "      arguments (ie: don't double quote the entire list. Provide it as you\n"
       "      would multiple arguments for any shell program).\n"
-      "      Example: gcocoadialog dropdown --text \"Favorite OS?\" --items \"GNU/Linux\"\n"
+      "      Example: gtdialog dropdown --text \"Favorite OS?\" --items \"GNU/Linux\"\n"
       "      \"OS X\" Windows Amiga \"TI 89\" --button1 gtk-ok\n"
       "  --pulldown\n"
       "      Sets the style to a pull-down box, which differs slightly from the\n"
       "      default pop-up style. The first item remains visible. This option\n"
       "      probably isn't very useful for a single-function dialog such as those\n"
-      "      gcocoadialog provides, but I've included it just in case it is. To see\n"
-      "      how their appearances differ, just try them both.\n"
+      "      gtdialog provides, but I've included it just in case it is. To see how\n"
+      "      their appearances differ, just try them both.\n"
       "  --selected index\n"
       "      The zero-based index of the item in the list to select. The first item in\n"
       "      the list is always selected by default.\n"
@@ -1397,9 +1397,9 @@ int error(int argc, char *argv[]) {
       "      The amount of time, in seconds, that the window will be displayed if the\n"
       "      user does not click a button. Does not time out by default.\n";
     break;
-  case GCDIALOG_FILTEREDLIST:
+  case GTDIALOG_FILTEREDLIST:
     msg =
-      "gcocoadialog filteredlist [options]\n"
+      "gtdialog filteredlist [options]\n"
       "\n"
       "This control provides a list of items to filter through. Text entered into the\n"
       "input box is matched case-sensitively to the first column of list items. Non-\n"
@@ -1416,7 +1416,7 @@ int error(int argc, char *argv[]) {
       "      should be space separated and given as multiple arguments (ie: don't\n"
       "      double quote the entire list. Provide it as you would multiple arguments\n"
       "      for any shell program).\n"
-      "      Example: gcocoadialog filteredlist --columns Foo Bar --items foo bar\n"
+      "      Example: gtdialog filteredlist --columns Foo Bar --items foo bar\n"
       "  --items list of items\n"
       "      Required after --columns. These are the items in the list each inserted\n"
       "      into the first empty column in the first non-full row. list of items\n"
@@ -1439,14 +1439,14 @@ int error(int argc, char *argv[]) {
       "      selection.\n"
       "\n"
       "Example:\n"
-      "  gcocoadialog filteredlist \\\n"
+      "  gtdialog filteredlist \\\n"
       "    --columns Foo Bar \\\n"
       "    --items foobar barfoo foobaz bazfoo barbaz bazbar \\\n"
       "    --select-multiple\n";
     break;
   default:
     msg =
-      "Usage: gcocoadialog type [options]\n"
+      "Usage: gtdialog type [options]\n"
       "  Available Types:\n"
       "    msgbox, ok-msgbox, yesno-msgbox, inputbox, standard-inputbox,\n"
       "    secure-inputbox, secure-standard-inputbox, fileselect, filesave,\n"
@@ -1480,7 +1480,7 @@ int error(int argc, char *argv[]) {
       "    --help\n"
       "        Gives a list of options and a link to this page.\n"
       "\n"
-      "For detailed documentation: gcocoadialog help [type]"
+      "For detailed documentation: gtdialog help [type]"
       "\n"
       "Note that bubble mode is not supported, as well as the following options:\n"
       "\"--icon\", \"--icon-file\", \"--select-directories\", \"--packages-as-directories\",\n"
@@ -1499,7 +1499,7 @@ int error(int argc, char *argv[]) {
 int main(int argc, char *argv[]) {
   if (argc == 1 || strcmp(argv[1], "help") == 0)
     return error(argc, argv);
-  int type = gcocoadialog_type(argv[1]);
+  int type = gtdialog_type(argv[1]);
   if (type < 0)
     return error(argc, argv);
 #if GTK
@@ -1507,7 +1507,7 @@ int main(int argc, char *argv[]) {
 #elif NCURSES
   initscr();
 #endif
-  char *out = gcocoadialog(type, argc - 2, (const char **)&argv[2]);
+  char *out = gtdialog(type, argc - 2, (const char **)&argv[2]);
 #if NCURSES
   endCDK();
 #endif

@@ -2,12 +2,12 @@
 
 ## Requirements
 
-The [GTK+][] version of GCocoaDialog only requires GTK+ version 2.16 or higher.
-It runs on Linux, Windows, and Mac OSX, provided a GTK runtime is available.
+The [GTK+][] version of gtDialog only requires GTK+ version 2.16 or higher. It
+runs on Linux, Windows, and Mac OSX, provided a GTK runtime is available.
 Installing and configuring the runtime is beyond the scope of this document.
 
-The [ncurses][] version of GCocoaDialog requires ncurses and [CDK][] and runs
-on Linux and probably Mac OSX.
+The [ncurses][] version of gtDialog requires ncurses and [CDK][] and runs on
+Linux and probably Mac OSX.
 
 [GTK+]: http://gtk.org
 [ncurses]: http://invisible-island.net/ncurses/ncurses.html
@@ -15,15 +15,15 @@ on Linux and probably Mac OSX.
 
 ## Download
 
-Download GCocoaDialog from the [project page][].
+Download gtDialog from the [project page][].
 
-[project page]: http://foicica.com/gcocoadialog
+[project page]: http://foicica.com/gtdialog
 
 ## Compiling
 
 Compiling the command-line program is currently only supported on Linux systems.
 If you want to try and compile for Windows or Mac OSX, please see the
-[Textadept][] project which compiles GCocoaDialog as a C library in the
+[Textadept][] project which compiles gtDialog as a C library in the
 `src/Makefile` file.
 
 [Textadept]: http://foicica.com/textadept
@@ -57,11 +57,11 @@ the [GTK+ for Windows bundle][] (2.24 is recommended).
 
 #### Mac OSX
 
-For GTK GCocoaDialog, [XCode][] is needed for Mac OSX as well as [jhbuild][].
-After building `meta-gtk-osx-bootstrap` and `meta-gtk-osx-core`, you need to
-build `meta-gtk-osx-themes`. Note that the entire compiling process can easily
-take 30 minutes or more and ultimately consume nearly 1GB of disk space. This is
-pretty ridiculous for a small application like GCocoaDialog.
+For GTK gtDialog, [XCode][] is needed for Mac OSX as well as [jhbuild][]. After
+building `meta-gtk-osx-bootstrap` and `meta-gtk-osx-core`, you need to build
+`meta-gtk-osx-themes`. Note that the entire compiling process can easily take 30
+minutes or more and ultimately consume nearly 1GB of disk space. This is pretty
+ridiculous for a small application like gtDialog.
 
 [XCode]: http://developer.apple.com/TOOLS/xcode/
 [jhbuild]: http://sourceforge.net/apps/trac/gtk-osx/wiki/Build
@@ -72,7 +72,7 @@ pretty ridiculous for a small application like GCocoaDialog.
 
 ##### Linux
 
-For Linux systems, simply run `make` in the `src/` directory. The `gcocoadialog`
+For Linux systems, simply run `make` in the `src/` directory. The `gtdialog`
 executable is created in the current directory. To build the ncurses version,
 run `make NCURSES=1`.
 
@@ -86,10 +86,10 @@ Unsupported.
 
 #### C Library
 
-Include both `gcocoadialog.h` and `gcocoadialog.c` in your project and compile
-`gcococadialog.c` with the either `GTK` or `NCURSES` flag and optionally the
-`NOHELP` and `LIBRARY` flags to disable printing help messages to `stdout` and
-ignoring the `main()` function.
+Include both `gtdialog.h` and `gtdialog.c` in your project and compile
+`gtdialog.c` with the either `GTK` or `NCURSES` flag and optionally the `NOHELP`
+and `LIBRARY` flags to disable printing help messages to `stdout` and ignoring
+the `main()` function.
 
 ## Installation
 
@@ -97,15 +97,15 @@ This section applies to the command-line program only.
 
 ### Linux
 
-After compiling GCocoaDialog, make a symlink from it to `/usr/bin/` or elsewhere
-in your `PATH`.
+After compiling gtDialog, make a symlink from it to `/usr/bin/` or elsewhere in
+your `PATH`.
 
 ### Windows
 
 Unsupported because compiling is unsupported. However, if you successfully
-compiled GCocoaDialog, you probably know how to install it.
+compiled gtDialog, you probably know how to install it.
 
 ### Mac OSX
 
 Unsupported because compiling is unsupported. However, if you successfully
-compiled GCocoaDialog, you probably know how to install it.
+compiled gtDialog, you probably know how to install it.

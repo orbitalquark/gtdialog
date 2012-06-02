@@ -2,26 +2,26 @@
 
 ## Overview
 
-GCocoaDialog can be used as either a command-line program for shell scripts or
-as a C library for applications.
+gtDialog can be used as either a command-line program for shell scripts or as a
+C library for applications.
 
 ### Using the Command-Line
 
-GCocoaDialog is executed like this:
+gtDialog is executed like this:
 
-    gcocoadialog type options
+    gtdialog type options
 
 Where `type` is specifies which dialog to use and `options` is a set of options
 for that dialog type.
 
 ### Using the C Library
 
-In order to use GCocoaDialog as a C library, first include `gcocoadialog.h` and
-`gcocoadialog.c` in your application. Then call `gcocoadialog()` with a
-`GCDialogType` followed by an `int argc` and a `char *argv[]` like you would
-have for a command-line application.  You can use a helper function
-`gcocoadialog_type()` for getting a `GCDialogType` from a string. An example
-is in the `main()` function of `gcocoadialog.c`.
+In order to use gtDialog as a C library, first include `gtdialog.h` and
+`gtdialog.c` in your application. Then call `gtdialog()` with a `GTDialogType`
+followed by an `int argc` and a `char *argv[]` like you would have for a
+command-line application.  You can use a helper function `gtdialog_type()` for
+getting a `GTDialogType` from a string. An example is in the `main()` function
+of `gtdialog.c`.
 
 ## Acknowledgements
 
@@ -66,7 +66,7 @@ language.
 
 For example in Bash:
 
-    val=`gcocoadialog yesno-msgbox --string-output`
+    val=`gtdialog yesno-msgbox --string-output`
     echo "You pressed the $val button"
 
 Dialogs that return multiple values will print each on its own line (separated
@@ -74,14 +74,14 @@ by newlines).
 
 ### C Library
 
-The return value of `gcocoadialog()` is a string that contains what the dialog
-would print to `stdout` when run from the command-line. It is your
-responsibility to `free()` that string when you are finished with it.
+The return value of `gtdialog()` is a string that contains what the dialog would
+print to `stdout` when run from the command-line. It is your responsibility to
+`free()` that string when you are finished with it.
 
 ## Limitations
 
-Despite trying to be a cocoaDialog clone, GCocoaDialog currently does not
-support the following dialogs and options (but it may at a later point in time):
+Despite trying to be a cocoaDialog clone, gtDialog currently does not support
+the following dialogs and options (but it may at a later point in time):
 
 * `bubble`
 * `--icon`
@@ -136,7 +136,7 @@ Return:
 
 Usage:
 
-    gcocoadialog msgbox --no-newline \
+    gtdialog msgbox --no-newline \
       --text "What's your favorite OS?" \
       --informative-text "The 'Cancel' label auto-binds that button to esc" \
       --button1 "OS X" --button2 "GNU/Linux" --button3 "Cancel"
@@ -179,7 +179,7 @@ Return:
 
 Usage:
 
-    gcocoadialog ok-msgbox --text "We need to make sure you see this message" \
+    gtdialog ok-msgbox --text "We need to make sure you see this message" \
       --informative-text "(Yes, the message was to inform you about itself)" \
       --no-newline --float
 
@@ -216,7 +216,7 @@ Return:
 
 Usage:
 
-    gcocoadialog yesno-msgbox --no-cancel --string-output --no-newline \
+    gtdialog yesno-msgbox --no-cancel --string-output --no-newline \
       --text  "This is a simple first example" \
       --informative-text "We're just going to echo the string output"
 
@@ -264,7 +264,7 @@ Return:
 
 Usage:
 
-    gcocoadialog inputbox --title "Search" --no-newline \
+    gtdialog inputbox --title "Search" --no-newline \
       --informative-text "Enter your search term" \
       --text "foobar" \
       --button1 "Search" --button2 "Search all" \
@@ -306,7 +306,7 @@ Return:
 
 Usage:
 
-    gcocoadialog standard-inputbox --title "Your Name" --no-newline \
+    gtdialog standard-inputbox --title "Your Name" --no-newline \
       --informative-text "Enter your name"
 
 - - -
@@ -354,7 +354,7 @@ Options: (in addition to [global options](#Global.Options))
   these extensions. `list of extensions` should be space separated, and given as
   multiple arguments (ie: don't double quote the list).
 
-  Example: `gcocoadialog fileselect --with-extensions .c .h .m .txt`
+  Example: `gtdialog fileselect --with-extensions .c .h .m .txt`
 
   The period/dot at the start of each extension is optional.
 * `‑‑with‑directory` _directory_: Start the file select window in `directory`.
@@ -370,7 +370,7 @@ Return:
 
 Usage:
 
-    gcocoadialog fileselect \
+    gtdialog fileselect \
       --title "This is a fileselect"\
       --text "Choose the source file for the main controller" \
       --with-extensions .c .m .cpp
@@ -399,7 +399,7 @@ Options: (in addition to [global options](#Global.Options))
   should be space separated, and given as multiple arguments (ie: don't double
   quote the list).
 
-  Example: `gcocoadialog filesave --with-extensions .c .h .m .txt`
+  Example: `gtdialog filesave --with-extensions .c .h .m .txt`
 
   The period/dot at the start of each extension is optional.
 * `‑‑with‑directory` _directory_: Start the file save window in `directory`. The
@@ -469,11 +469,11 @@ Return:
 
 Usage:
 
-    gcocoadialog textbox --title "License" --no-newline \
+    gtdialog textbox --title "License" --no-newline \
         --informative-text "Do you agree with the terms of this license?" \
         --text-from-file COPYING --button1 Ok --button2 Cancel
 
-    gcocoadialog textbox --title "License" --no-newline \
+    gtdialog textbox --title "License" --no-newline \
         --informative-text "Do you agree with the terms of this license?" \
         --text "This is the text of the license...." \
         --button1 Ok --button2 Cancel
@@ -517,7 +517,7 @@ Options: (in addition to [global options](#Global.Options))
   pole" (for lack of better description). It does not indicate how far the
   operations you're performing have progressed; it just shows that your
   application/script is busy. You can still update the text of the label when
-  writing to gcocoadialog's `stdin` - and it doesn't matter what percentage you
+  writing to gtdialog's `stdin` - and it doesn't matter what percentage you
   feed it.
 * `‑‑float`: Float on top of all windows.
 * `‑‑stoppable`: Show the stop button.
@@ -552,11 +552,11 @@ Options: (in addition to [global options](#Global.Options))
   it as you would multiple arguments for any shell program). The first item in
   the list is always selected by default.
 
-  Example: `gcocoadialog dropdown --text "Favorite OS?" --items "GNU/Linux" `
+  Example: `gtdialog dropdown --text "Favorite OS?" --items "GNU/Linux" `
   `"OS X" Windows Amiga "TI 89" --button1 "Ok"`
 * `‑‑pulldown`: Sets the style to a pull-down box, which differs slightly from
   the default pop-up style. The first item remains visible. This option probably
-  isn't very useful for a single-function dialog such as those GCocoaDialog
+  isn't very useful for a single-function dialog such as those gtDialog
   provides, but it's been included it just in case it is. To see how their
   appearances differ, just try them both.
 * `‑‑button1` "_label for button 1_": **Required**. This is the right-most
@@ -588,7 +588,7 @@ Return:
 
 Usage:
 
-    gcocoadialog dropdown --title "Preferred OS" --no-newline \
+    gtdialog dropdown --title "Preferred OS" --no-newline \
       --text "What is your favorite OS?" \
       --items "Mac OS X" "GNU/Linux" "Windows" --button1 'That one!' \
       --button2 Nevermind
@@ -614,11 +614,11 @@ Options: (in addition to [global options](#Global.Options))
   it as you would multiple arguments for any shell program). The first item in
   the list is always selected by default.
 
-  Example: `gcocoadialog dropdown --text "Favorite OS?" --items "GNU/Linux" `
+  Example: `gtdialog dropdown --text "Favorite OS?" --items "GNU/Linux" `
   `"OS X" Windows Amiga "TI 89" --button1 "Ok"`
 * `‑‑pulldown`: Sets the style to a pull-down box, which differs slightly from
   the default pop-up style. The first item remains visible. This option probably
-  isn't very useful for a single-function dialog such as those GCocoaDialog
+  isn't very useful for a single-function dialog such as those gtDialog
   provides, but it's been included it just in case it is. To see how their
   appearances differ, just try them both.
 * `‑‑exit‑onchange`: Makes the program exit immediately after the selection
@@ -668,7 +668,7 @@ Options: (in addition to [global options](#Global.Options))
   multiple arguments (ie: don't double quote the entire list. Provide it as you
   would multiple arguments for any shell program).
 
-  Example: `gcocoadialog filteredlist --columns Foo Bar --items foo bar`
+  Example: `gtdialog filteredlist --columns Foo Bar --items foo bar`
 * `--items` _list of items_: **Required after `--columns`**. These are the items
   in the list each inserted into the first empty column in the first non-full
   row. `list of items` should be space separated and given as multiple arguments
@@ -699,7 +699,7 @@ Return:
 
 Usage:
 
-    gcocoadialog filteredlist \
+    gtdialog filteredlist \
       --columns Foo Bar \
       --items foobar barfoo foobaz bazfoo barbaz bazbar \
       --select-multiple

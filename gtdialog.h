@@ -1,5 +1,5 @@
 /**
- * A CocoaDialog clone written in C using GTK.
+ * A CocoaDialog clone written in C using GTK or ncurses.
  *
  * The MIT License
  *
@@ -24,29 +24,29 @@
  * THE SOFTWARE.
  */
 
-#ifndef GCOCOADIALOG_H
-#define GCOCOADIALOG_H
+#ifndef GTDIALOG_H
+#define GTDIALOG_H
 
-enum GCDialogTypes {
-  GCDIALOG_MSGBOX,
-  GCDIALOG_OK_MSGBOX,
-  GCDIALOG_YESNO_MSGBOX,
-  GCDIALOG_INPUTBOX,
-  GCDIALOG_STANDARD_INPUTBOX,
-  GCDIALOG_SECURE_INPUTBOX,
-  GCDIALOG_SECURE_STANDARD_INPUTBOX,
-  GCDIALOG_FILESELECT,
-  GCDIALOG_FILESAVE,
-  GCDIALOG_TEXTBOX,
-  GCDIALOG_PROGRESSBAR,
-  GCDIALOG_DROPDOWN,
-  GCDIALOG_STANDARD_DROPDOWN,
-  GCDIALOG_FILTEREDLIST,
+enum GTDialogTypes {
+  GTDIALOG_MSGBOX,
+  GTDIALOG_OK_MSGBOX,
+  GTDIALOG_YESNO_MSGBOX,
+  GTDIALOG_INPUTBOX,
+  GTDIALOG_STANDARD_INPUTBOX,
+  GTDIALOG_SECURE_INPUTBOX,
+  GTDIALOG_SECURE_STANDARD_INPUTBOX,
+  GTDIALOG_FILESELECT,
+  GTDIALOG_FILESAVE,
+  GTDIALOG_TEXTBOX,
+  GTDIALOG_PROGRESSBAR,
+  GTDIALOG_DROPDOWN,
+  GTDIALOG_STANDARD_DROPDOWN,
+  GTDIALOG_FILTEREDLIST,
 };
 
-typedef enum GCDialogTypes GCDialogType;
+typedef enum GTDialogTypes GTDialogType;
 
-GCDialogType gcocoadialog_type(const char *type);
-char *gcocoadialog(GCDialogType type, int narg, const char *args[]);
+GTDialogType gtdialog_type(const char *type);
+char *gtdialog(GTDialogType type, int narg, const char *args[]);
 
 #endif
