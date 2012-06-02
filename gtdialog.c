@@ -58,6 +58,8 @@ int output_col = 0, search_col = 0;
 #define gtk_combo_box_append_text gtk_combo_box_text_append_text
 #define gtk_combo_box_get_active_text gtk_combo_box_text_get_active_text
 #endif
+#elif NCURSES
+#define copy(s) strcpy(malloc(strlen(s) + 1), s)
 #endif
 
 GTDialogType gtdialog_type(const char *type) {
@@ -777,7 +779,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if GTK
           txt = (char *)gtk_entry_get_text(GTK_ENTRY(entry));
 #elif NCURSES
-          txt = getCDKEntryValue(entry);
+          txt = copy(getCDKEntryValue(entry));
+          created = 1;
           destroyCDKEntry(entry);
 #endif
         } else if (type == GTDIALOG_TEXTBOX) {
@@ -793,7 +796,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
             pango_font_description_free(font);
           }
 #elif NCURSES
-          txt = getCDKMentryValue(textview);
+          txt = copy(getCDKMentryValue(textview));
+          created = 1;
           destroyCDKMentry(textview);
 #endif
         } else if (type == GTDIALOG_DROPDOWN ||
