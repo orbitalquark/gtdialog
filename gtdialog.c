@@ -31,14 +31,14 @@
 #if GTK
 #include <gtk/gtk.h>
 #elif NCURSES
-#include <cdk/cdk.h>
+#include <cdk.h>
 #endif
 
 #include "gtdialog.h"
 
 // Default variables.
 int string_output = 0;
-int output_col = 0, search_col = 0;
+int output_col = 1, search_col = 1;
 
 #if GTK
 #define STR_OK "gtk-ok"
@@ -115,9 +115,7 @@ static void list_foreach(GtkTreeModel *model, GtkTreePath *path,
                          GtkTreeIter *iter, gpointer userdata) {
   char *value;
   if (string_output) {
-    if (output_col >= gtk_tree_model_get_n_columns(model))
-      output_col = gtk_tree_model_get_n_columns(model) - 1;
-    gtk_tree_model_get(model, iter, output_col, &value, -1);
+    gtk_tree_model_get(model, iter, output_col - 1, &value, -1);
   } else {
     path =
       gtk_tree_model_filter_convert_path_to_child_path(
@@ -141,7 +139,7 @@ static gboolean list_visible(GtkTreeModel *model, GtkTreeIter *iter,
   if (strlen(entry_text) > 0) {
     char *text = g_utf8_strdown(entry_text, -1);
     char *value, *lower, *p;
-    gtk_tree_model_get(model, iter, search_col, &value, -1);
+    gtk_tree_model_get(model, iter, search_col - 1, &value, -1);
     lower = g_utf8_strdown(value, -1);
     p = lower;
     char **tokens = g_strsplit(text, " ", 0);
@@ -199,6 +197,124 @@ static int buttonbox_tab(EObjectType cdkType, void *object, void *data,
   injectCDKButtonbox((CDKBUTTONBOX *)data, key);
   return TRUE;
 }
+
+typedef struct {
+  int ncols;
+  int search_col;
+  char **items;
+  int len;
+  char **rows;
+  char **filtered_rows;
+  CDKSCROLL *scrolled;
+} Model;
+
+static char *strdown(char *s) {
+  char *lower = copy(s);
+  int i, len = strlen(s);
+  for (i = 0; i < len; i++)
+    lower[i] = tolower(s[i]);
+  return lower;
+}
+
+static int entry_keypress(EObjectType cdkType, void *object, void *data,
+                           chtype key) {
+  Model *model = (Model *)data;
+  char *entry_text = getCDKEntryValue((CDKENTRY *)object);
+  if (strlen(entry_text) > 0) {
+    char *text = strdown(entry_text);
+    char **tokens = CDKsplitString(text, ' ');
+    int i, j, row = 0;
+    for (i = 0; i < model->len; i += model->ncols) {
+      char *lower = strdown(model->items[i + model->search_col - 1]);
+      char *p = lower;
+      int visible = 1;
+      j = 0;
+      while (tokens[j] != NULL) {
+        if (!(p = strstr(p, tokens[j]))) {
+          visible = 0;
+          break;
+        }
+        p += strlen(tokens[j++]);
+      }
+      if (visible)
+        model->filtered_rows[row++] = model->rows[i / model->ncols];
+      free(lower);
+    }
+    free(text);
+    CDKfreeStrings(tokens);
+    setCDKScrollItems(model->scrolled, model->filtered_rows, row, FALSE);
+  } else {
+    setCDKScrollItems(model->scrolled, model->rows, model->len / model->ncols,
+                      FALSE);
+  }
+  HasFocusObj(ObjOf(model->scrolled)) = TRUE; // needed to draw highlight
+  eraseCDKScroll(model->scrolled); // drawCDKScroll does not completely redraw
+  drawCDKScroll(model->scrolled, TRUE);
+  HasFocusObj(ObjOf(model->scrolled)) = FALSE;
+  return TRUE;
+}
+
+static int *col_widths(char **cols, int ncols, char **items, int len) {
+  int *widths = malloc(sizeof(int) * ncols);
+  int i, j;
+  for (i = 0; i < ncols; i++) {
+    int max = 0;
+    for (j = (ncols - 1) * i; j < len; j += ncols) {
+      int slen = strlen(items[j]);
+      if (slen > max)
+        max = slen;
+    }
+    widths[i] = (max - strlen(cols[i]) > 0) ? max : strlen(cols[i]);
+  }
+  return widths;
+}
+
+static char *col_header(char **cols, int ncols, int *col_widths) {
+  int i, j, len = 0;
+  for (i = 0; i < ncols; i++)
+    len += col_widths[i] + 1;
+  char *header = malloc(len + 9);
+  char *p = stpcpy(header, "</U>");
+  for (i = 0; i < ncols; i++) {
+    p = stpcpy(p, cols[i]);
+    int padding = col_widths[i] - strlen(cols[i]);
+    if (padding > 0)
+      for (j = 0; j < padding; j++)
+        *p++ = ' ';
+    *p++ = '|';
+  }
+  if (len > 0)
+    p--;
+  stpcpy(p, "<!U>\0");
+  return header;
+}
+
+static char **item_rows(int *col_widths, int ncols, char **items, int len) {
+  int i, j, ilen = 0;
+  for (i = 0; i < ncols; i++)
+    ilen += col_widths[i] + 1;
+  char **new_items = malloc(sizeof(char *) * (len / ncols));
+  for (i = 0; i < len; i += ncols) {
+    char *item = malloc(ilen);
+    char *p = item;
+    for (j = i; j < i + ncols; j++) {
+      p = stpcpy(p, items[j]);
+      *p++ = '|';
+    }
+    if (len > 0)
+      *(p - 1) = '\0';
+    new_items[i / ncols] = item;
+  }
+  return new_items;
+}
+
+static int scrolled_key(EObjectType cdkType, void *object, void *data,
+                        chtype key) {
+  HasFocusObj(ObjOf((CDKSCROLL *)data)) = TRUE; // needed to draw highlight
+  injectCDKScroll((CDKSCROLL *)data, key);
+  HasFocusObj(ObjOf((CDKSCROLL *)data)) = FALSE;
+  return TRUE;
+}
 #endif
 
 char *gtdialog(GTDialogType type, int narg, const char *args[]) {
@@ -221,8 +337,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   PangoFontDescription *font = NULL;
   GtkFileFilter *filter = NULL;
 #endif
-  output_col = 0;
-  search_col = 0;
+  output_col = 1;
+  search_col = 1;
 
   // Set dialog defaults.
 #if NCURSES
@@ -264,6 +380,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if GTK
     width = 500;
     height = 360;
+#elif NCURSES
+    height = 20;
 #endif
     buttons[0] = STR_OK;
   }
@@ -370,8 +488,13 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           type <= GTDIALOG_SECURE_STANDARD_INPUTBOX)
         no_show = 1;
     } else if (strcmp(arg, "--output-column") == 0) {
-      if (type == GTDIALOG_FILTEREDLIST)
+      if (type == GTDIALOG_FILTEREDLIST) {
         output_col = atoi(args[i++]);
+        if (output_col > ncols)
+          output_col = ncols;
+        else if (output_col < 1)
+          output_col = 1;
+      }
     } else if (strcmp(arg, "--packages-as-directories") == 0) {
       //if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
         // not implemented
@@ -389,8 +512,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     } else if (strcmp(arg, "--search-column") == 0) {
       if (type == GTDIALOG_FILTEREDLIST) {
         search_col = atoi(args[i++]);
-        if (search_col >= ncols)
-          search_col = ncols - 1;
+        if (search_col > ncols)
+          search_col = ncols;
+        else if (search_col < 1)
+          search_col = 1;
       }
     } else if (strcmp(arg, "--select-directories") == 0) {
       //if (type == GTDIALOG_FILESELECT)
@@ -453,6 +578,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   CDKSLIDER *progressbar;
   CDKITEMLIST *combobox;
   CDKBUTTONBOX *buttonbox;
+  CDKSCROLL *scrolled;
+  Model model = { ncols, search_col, (char **)items, len, NULL, NULL, NULL };
   CDKFSELECT *fileselect;
 #endif
   if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE) {
@@ -664,7 +791,32 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           col = 0; // new row
       }
 #elif NCURSES
-      // TODO:
+      entry = newCDKEntry(dialog, LEFT, TOP, (char *)title, (char *)info_text,
+                          A_NORMAL, '_', vMIXED, 0, 0, 100, FALSE, FALSE);
+      int *widths = col_widths((char **)cols, ncols, (char **)items, len);
+      char *header = col_header((char **)cols, ncols, widths);
+      char **rows = item_rows(widths, ncols, (char **)items, len);
+      scrolled = newCDKScroll(dialog, LEFT, CENTER, RIGHT, -6, 0, header, rows,
+                              len / ncols, FALSE, A_REVERSE, TRUE, FALSE);
+      if (widths)
+        free(widths);
+      if (header)
+        free(header);
+      model.rows = rows;
+      model.filtered_rows = malloc(sizeof(char *) * (len / ncols));
+      for (i = 0; i < len / ncols; i++)
+        model.filtered_rows[i] = model.rows[i];
+      model.scrolled = scrolled;
+      bindCDKObject(vENTRY, entry, KEY_TAB, buttonbox_tab, buttonbox);
+      bindCDKObject(vENTRY, entry, KEY_BTAB, buttonbox_tab, buttonbox);
+      bindCDKObject(vENTRY, entry, KEY_UP, scrolled_key, scrolled);
+      bindCDKObject(vENTRY, entry, KEY_DOWN, scrolled_key, scrolled);
+      bindCDKObject(vENTRY, entry, KEY_PPAGE, scrolled_key, scrolled);
+      bindCDKObject(vENTRY, entry, KEY_NPAGE, scrolled_key, scrolled);
+      setCDKEntryPostProcess(entry, entry_keypress, &model);
+      // TODO: commands to scroll the list to the right and left.
+      if (text)
+        setCDKEntryValue(entry, (char *)text);
 #endif
     }
   } else {
@@ -752,6 +904,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       activateCDKItemlist(combobox, NULL);
       response = (combobox->exitType == vNORMAL) ? 1 + buttonbox->currentButton
                                                  : RESPONSE_DELETE;
+    } else if (type == GTDIALOG_FILTEREDLIST) {
+      activateCDKEntry(entry, NULL);
+      response = (entry->exitType == vNORMAL) ? 1 + buttonbox->currentButton
+                                              : RESPONSE_DELETE;
     } else {
       response = 1 + activateCDKButtonbox(buttonbox, NULL);
       if (response == 0) // activateCDKButtonbox returns -1 on escape
@@ -806,7 +962,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if GTK
             txt = gtk_combo_box_get_active_text(GTK_COMBO_BOX(combobox));
 #elif NCURSES
-            txt = (char *)items[getCDKItemlistCurrentItem(combobox)];
+            if (len > 0)
+              txt = (char *)items[getCDKItemlistCurrentItem(combobox)];
+            else
+              txt = "";
             destroyCDKItemlist(combobox);
 #endif
           } else {
@@ -831,6 +990,37 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
             txt[strlen(txt) - 1] = '\0'; // chomp '\n'
           g_string_free(gstr, TRUE);
           created = 1;
+#elif NCURSES
+          if (getCDKScrollItems(scrolled, NULL) > 0) {
+            i = getCDKScrollCurrentItem(scrolled);
+            if (strlen(getCDKEntryValue(entry)) > 0) {
+              char *item = model.filtered_rows[i];
+              int j;
+              for (j = 0; j < model.len / model.ncols; j++)
+                if (strcmp(item, model.rows[j]) == 0) {
+                  i = j; // non-filtered index of selected item
+                  break;
+                }
+            }
+            if (string_output) {
+              txt = (char *)items[i * ncols + output_col - 1];
+            } else {
+              txt = malloc(4);
+              sprintf(txt, "%i", i);
+              created = 1;
+            }
+          } else {
+            txt = "";
+          }
+          destroyCDKEntry(entry);
+          destroyCDKScroll(scrolled);
+          if (model.rows) {
+            for (i = 0; i < len / ncols; i++)
+              free(model.rows[i]);
+            free(model.rows);
+          }
+          if (model.filtered_rows)
+            free(model.filtered_rows);
 #endif
         }
         char *new_out = malloc(strlen(out) + strlen(txt) + 2);
@@ -1428,9 +1618,9 @@ int error(int argc, char *argv[]) {
       "      double quote the entire list. Provide it as you would multiple arguments\n"
       "      for any shell program).\n"
       "  --search-column col\n"
-      "      Required after --columns. The column to use for searching. Default is 0.\n"
+      "      Required after --columns. The column to use for searching. Default is 1.\n"
       "  --output-column col\n"
-      "      The column to use for --string-output. Default is 0.\n"
+      "      The column to use for --string-output. Default is 1.\n"
       "  --button1 \"label for button 1\"\n"
       "      Required. The right-most button.\n"
       "  --button2 \"label for button 2\"\n"
