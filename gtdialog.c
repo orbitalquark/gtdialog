@@ -204,6 +204,7 @@ typedef struct {
   char **items;
   int len;
   char **rows;
+  int num_rows;
   char **filtered_rows;
   CDKSCROLL *scrolled;
 } Model;
@@ -254,58 +255,37 @@ static int entry_keypress(EObjectType cdkType, void *object, void *data,
   return TRUE;
 }
 
-static int *col_widths(char **cols, int ncols, char **items, int len) {
-  int *widths = malloc(sizeof(int) * ncols);
-  int i, j;
+static char **item_rows(char **cols, int ncols, char **items, int len) {
+  int *col_widths = malloc(sizeof(int) * ncols);
+  int i, j, row_len = 0;
   for (i = 0; i < ncols; i++) {
-    int max = 0;
-    for (j = (ncols - 1) * i; j < len; j += ncols) {
+    int max = strlen(cols[i]);
+    for (j = i; j < len; j += ncols) {
       int slen = strlen(items[j]);
       if (slen > max)
         max = slen;
     }
-    widths[i] = (max - strlen(cols[i]) > 0) ? max : strlen(cols[i]);
+    col_widths[i] = max;
+    row_len += col_widths[i] + 1;
   }
-  return widths;
-}
-
-static char *col_header(char **cols, int ncols, int *col_widths) {
-  int i, j, len = 0;
-  for (i = 0; i < ncols; i++)
-    len += col_widths[i] + 1;
-  char *header = malloc(len + 9);
-  char *p = stpcpy(header, "</U>");
-  for (i = 0; i < ncols; i++) {
-    p = stpcpy(p, cols[i]);
-    int padding = col_widths[i] - strlen(cols[i]);
-    if (padding > 0)
-      for (j = 0; j < padding; j++)
+  char **new_items = malloc(sizeof(char *) * ((len + ncols - 1) / ncols + 1));
+  for (i = -ncols; i < len; i += ncols) {
+    char *new_item = malloc((i < 0) ? row_len + 4 : row_len);
+    char *p = (i < 0) ? stpcpy(new_item, "</U>") : new_item;
+    for (j = i; j < i + ncols && j < len; j++) {
+      char *item = (i < 0) ? cols[j - i] : items[j];
+      p = stpcpy(p, item);
+      int padding = col_widths[j - i] - strlen(item);
+      while (padding-- > 0)
         *p++ = ' ';
-    *p++ = '|';
-  }
-  if (len > 0)
-    p--;
-  stpcpy(p, "<!U>\0");
-  return header;
-}
-
-static char **item_rows(int *col_widths, int ncols, char **items, int len) {
-  int i, j, ilen = 0;
-  for (i = 0; i < ncols; i++)
-    ilen += col_widths[i] + 1;
-  char **new_items = malloc(sizeof(char *) * (len / ncols));
-  for (i = 0; i < len; i += ncols) {
-    char *item = malloc(ilen);
-    char *p = item;
-    for (j = i; j < i + ncols; j++) {
-      p = stpcpy(p, items[j]);
-      *p++ = '|';
+      *p++ = (i < 0) ? '|' : ' ';
     }
-    if (len > 0)
+    if (p > new_item)
       *(p - 1) = '\0';
-    new_items[i / ncols] = item;
+    new_items[i / ncols + 1] = new_item;
   }
-  return new_items;
+  free(col_widths);
+  return &new_items[1]; // items start here
 }
 
 static int scrolled_key(EObjectType cdkType, void *object, void *data,
@@ -579,7 +559,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   CDKITEMLIST *combobox;
   CDKBUTTONBOX *buttonbox;
   CDKSCROLL *scrolled;
-  Model model = { ncols, search_col, (char **)items, len, NULL, NULL, NULL };
+  Model model = { ncols, search_col, (char **)items, len, NULL, 0, NULL, NULL };
   CDKFSELECT *fileselect;
 #endif
   if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE) {
@@ -793,18 +773,14 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #elif NCURSES
       entry = newCDKEntry(dialog, LEFT, TOP, (char *)title, (char *)info_text,
                           A_NORMAL, '_', vMIXED, 0, 0, 100, FALSE, FALSE);
-      int *widths = col_widths((char **)cols, ncols, (char **)items, len);
-      char *header = col_header((char **)cols, ncols, widths);
-      char **rows = item_rows(widths, ncols, (char **)items, len);
-      scrolled = newCDKScroll(dialog, LEFT, CENTER, RIGHT, -6, 0, header, rows,
-                              len / ncols, FALSE, A_REVERSE, TRUE, FALSE);
-      if (widths)
-        free(widths);
-      if (header)
-        free(header);
+      char **rows = item_rows((char **)cols, ncols, (char **)items, len);
+      int num_rows = (len + ncols - 1) / ncols; // account for non-full rows
+      scrolled = newCDKScroll(dialog, LEFT, CENTER, RIGHT, -6, 0, rows[-1],
+                              rows, num_rows, FALSE, A_REVERSE, TRUE, FALSE);
       model.rows = rows;
-      model.filtered_rows = malloc(sizeof(char *) * (len / ncols));
-      for (i = 0; i < len / ncols; i++)
+      model.num_rows = num_rows;
+      model.filtered_rows = malloc(sizeof(char *) * num_rows);
+      for (i = 0; i < num_rows; i++)
         model.filtered_rows[i] = model.rows[i];
       model.scrolled = scrolled;
       bindCDKObject(vENTRY, entry, KEY_TAB, buttonbox_tab, buttonbox);
@@ -996,14 +972,17 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
             if (strlen(getCDKEntryValue(entry)) > 0) {
               char *item = model.filtered_rows[i];
               int j;
-              for (j = 0; j < model.len / model.ncols; j++)
+              for (j = 0; j < model.num_rows; j++)
                 if (strcmp(item, model.rows[j]) == 0) {
                   i = j; // non-filtered index of selected item
                   break;
                 }
             }
             if (string_output) {
-              txt = (char *)items[i * ncols + output_col - 1];
+              if (i * ncols + output_col - 1 < len)
+                txt = (char *)items[i * ncols + output_col - 1];
+              else
+                txt = "";
             } else {
               txt = malloc(4);
               sprintf(txt, "%i", i);
@@ -1015,9 +994,9 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           destroyCDKEntry(entry);
           destroyCDKScroll(scrolled);
           if (model.rows) {
-            for (i = 0; i < len / ncols; i++)
+            for (i = -1; i < model.num_rows; i++)
               free(model.rows[i]);
-            free(model.rows);
+            free(&model.rows[-1]);
           }
           if (model.filtered_rows)
             free(model.filtered_rows);
