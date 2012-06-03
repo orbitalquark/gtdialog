@@ -58,9 +58,8 @@ int output_col = 1, search_col = 1;
 #define gtk_combo_box_append_text gtk_combo_box_text_append_text
 #define gtk_combo_box_get_active_text gtk_combo_box_text_get_active_text
 #endif
-#elif NCURSES
-#define copy(s) strcpy(malloc(strlen(s) + 1), s)
 #endif
+#define copy(s) strcpy(malloc(strlen(s) + 1), s)
 
 GTDialogType gtdialog_type(const char *type) {
   if (strcmp(type, "msgbox") == 0)
@@ -723,6 +722,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                                 FALSE, FALSE);
 #endif
     } else if (type == GTDIALOG_FILTEREDLIST) {
+      if (ncols == 0)
+        return copy("Error: --columns not given.\n");
 #if GTK
       entry = gtk_entry_new();
       gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
@@ -961,7 +962,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           gtk_tree_selection_selected_foreach(
             gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview)), list_foreach,
                                         gstr);
-          txt = g_strdup(gstr->str);
+          txt = copy(gstr->str);
           if (strlen(txt) > 0)
             txt[strlen(txt) - 1] = '\0'; // chomp '\n'
           g_string_free(gstr, TRUE);
