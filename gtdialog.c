@@ -205,6 +205,7 @@ typedef struct {
   char **rows;
   int num_rows;
   char **filtered_rows;
+  CDKENTRY *entry;
   CDKSCROLL *scrolled;
 } Model;
 
@@ -250,6 +251,7 @@ static int entry_keypress(EObjectType cdkType, void *object, void *data,
   HasFocusObj(ObjOf(model->scrolled)) = TRUE; // needed to draw highlight
   eraseCDKScroll(model->scrolled); // drawCDKScroll does not completely redraw
   drawCDKScroll(model->scrolled, TRUE);
+  drawCDKEntry(model->entry, FALSE);
   HasFocusObj(ObjOf(model->scrolled)) = FALSE;
   return TRUE;
 }
@@ -551,6 +553,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   GtkWidget *dialog, *entry, *textview, *progressbar, *combobox, *treeview;
   GtkListStore *list;
 #elif NCURSES
+  int cursor = curs_set(1); // enable cursor
   CDKSCREEN *dialog;
   CDKENTRY *entry;
   CDKMENTRY *textview;
@@ -783,6 +786,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       model.filtered_rows = malloc(sizeof(char *) * num_rows);
       for (i = 0; i < num_rows; i++)
         model.filtered_rows[i] = model.rows[i];
+      model.entry = entry;
       model.scrolled = scrolled;
       bindCDKObject(vENTRY, entry, KEY_TAB, buttonbox_tab, buttonbox);
       bindCDKObject(vENTRY, entry, KEY_BTAB, buttonbox_tab, buttonbox);
@@ -1072,6 +1076,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #elif NCURSES
   delwin(dialog->window);
   destroyCDKScreen(dialog);
+  curs_set(cursor); // restore cursor
 #endif
   if (!no_newline) {
     char *new_out = malloc(strlen(out) + 2);
