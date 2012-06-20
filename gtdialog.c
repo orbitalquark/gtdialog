@@ -31,7 +31,10 @@
 #if GTK
 #include <gtk/gtk.h>
 #elif NCURSES
-#include <cdk.h>
+#ifdef LIBRARY
+#include <termios.h>
+#endif
+#include <cdk/cdk.h>
 #endif
 
 #include "gtdialog.h"
@@ -301,6 +304,11 @@ static int scrolled_key(EObjectType cdkType, void *object, void *data,
 char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   int RESPONSE_DELETE = -1; // timeout is 0
   char *out = NULL;
+
+#if NCURSES && LIBRARY
+  struct termios term;
+  tcgetattr(0, &term);
+#endif
 
   // Default variables.
   int height = -1, floating = 0, no_newline = 0, timeout = 0, width = -1;
@@ -812,7 +820,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           gtk_file_chooser_set_action(GTK_FILE_CHOOSER(dialog),
                                       GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
 #elif NCURSES
-      dialog = initCDKScreen(newwin(height, width, 0, 0));
+      dialog = initCDKScreen(newwin(height, width, 1, 1));
       fileselect = newCDKFselect(dialog, LEFT, TOP, 0, 0, (char *)title,
                                  (char *)text, A_NORMAL, '_', A_REVERSE, "</B>",
                                  "</N>", "</N>", "</N>", TRUE, FALSE);
@@ -827,7 +835,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog),
                                                      TRUE);
 #elif NCURSES
-      dialog = initCDKScreen(newwin(height, width, 0, 0));
+      dialog = initCDKScreen(newwin(height, width, 1, 1));
       fileselect = newCDKFselect(dialog, LEFT, TOP, 0, 0, (char *)title,
                                  (char *)text, A_NORMAL, '_', A_REVERSE, "</B>",
                                  "</N>", "</N>", "</N>", TRUE, FALSE);
@@ -1077,6 +1085,9 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   delwin(dialog->window);
   destroyCDKScreen(dialog);
   curs_set(cursor); // restore cursor
+#if LIBRARY
+  tcsetattr(0, TCSANOW, &term);
+#endif
 #endif
   if (!no_newline) {
     char *new_out = malloc(strlen(out) + 2);
