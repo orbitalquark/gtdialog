@@ -34,7 +34,7 @@
 #ifdef LIBRARY
 #include <termios.h>
 #endif
-#include <cdk/cdk.h>
+#include <cdk.h>
 #endif
 
 #include "gtdialog.h"
@@ -565,7 +565,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   CDKSCREEN *dialog;
   CDKENTRY *entry;
   CDKMENTRY *textview;
-  CDKSLIDER *progressbar;
+//  CDKSLIDER *progressbar;
   CDKITEMLIST *combobox;
   CDKBUTTONBOX *buttonbox;
   CDKSCROLL *scrolled;
