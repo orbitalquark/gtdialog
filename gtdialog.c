@@ -34,6 +34,7 @@
 #ifdef LIBRARY
 #include <termios.h>
 #endif
+#include <iconv.h>
 #include <cdk.h>
 #endif
 
@@ -317,7 +318,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 
   // Dialog-specific variables.
   int editable = 0, exit_onchange = 0, focus_textbox = 0, indeterminate = 0,
-      no_show = 0, percent = 0, multiple = 0, only_dirs = 0, selected = 0;
+      no_show = 0, percent = 0, multiple = 0, only_dirs = 0, selected = 0,
+      no_utf8 = 0;
   const char *buttons[3] = { NULL, NULL, NULL}, **cols = NULL,
              *info_text = NULL, **items = NULL, *scroll_to = "top",
              *text = NULL, *dir = NULL, *file = NULL;
@@ -472,10 +474,13 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     } else if (strcmp(arg, "--no-create-directories") == 0) {
       //if (type == GTDIALOG_FILESAVE)
         // not implemented
-   } else if (strcmp(arg, "--no-show") == 0) {
+    } else if (strcmp(arg, "--no-show") == 0) {
       if (type >= GTDIALOG_INPUTBOX &&
           type <= GTDIALOG_SECURE_STANDARD_INPUTBOX)
         no_show = 1;
+    } else if (strcmp(arg, "--no-utf8") == 0) {
+      if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
+        no_utf8 = 1;
     } else if (strcmp(arg, "--output-column") == 0) {
       if (type == GTDIALOG_FILTEREDLIST) {
         output_col = atoi(args[i++]);
@@ -1054,12 +1059,32 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       *out = '\0';
     }
 #elif NCURSES
+    const char *charset = getenv("CHARSET");
+    if (!charset || !*charset) {
+      char *locale = getenv("LC_ALL");
+      if (!locale || !*locale) locale = getenv("LANG");
+      if (locale && (charset = strchr(locale, '.'))) charset++;
+    }
     char *text = activateCDKFselect(fileselect, NULL);
     if (text) {
+      size_t text_len = strlen(text);
+      char *iconv_out = malloc(text_len + 1);
+      if (!no_utf8) {
+        // Convert to UTF-8.
+        iconv_t cd = iconv_open("UTF-8", charset);
+        if (cd != (iconv_t)-1) {
+          char *inp = text, *outp = iconv_out;
+          size_t inbytesleft = text_len, outbytesleft = text_len;
+          if (iconv(cd, &inp, &inbytesleft, &outp, &outbytesleft) != -1)
+            text = iconv_out, text[outp - iconv_out] = '\0';
+          iconv_close(cd);
+        }
+      }
       int len = strlen(text);
       out = malloc(len + 1);
       strncpy(out, text, len);
       out[len] = '\0';
+      free(iconv_out);
     } else {
       out = malloc(1);
       *out = '\0';
@@ -1348,6 +1373,9 @@ int error(int argc, char *argv[]) {
       "      Start the file select window with file already selected. By default no\n"
       "      file will be selected. This must be used with --with-directory. It should\n"
       "      be the filename of a file within the directory.\n"
+      "  --no-utf8\n"
+      "      Do not convert filenames to UTF-8. By default filenames are converted\n"
+      "      to UTF-8. This option has no effect on GTK."
       "\n"
       "Example:\n"
       "  gtdialog fileselect \\\n"
@@ -1390,6 +1418,9 @@ int error(int argc, char *argv[]) {
       "      Start the file select window with file already selected. By default no\n"
       "      file will be selected. This must be used with --with-directory. It should\n"
       "      be the filename of a file within the directory.\n";
+      "  --no-utf8\n"
+      "      Do not convert filenames to UTF-8. By default filenames are converted\n"
+      "      to UTF-8. This option has no effect on GTK."
     break;
   case GTDIALOG_TEXTBOX:
     msg =

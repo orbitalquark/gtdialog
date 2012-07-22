@@ -363,6 +363,8 @@ Options: (in addition to [global options](#Global.Options))
 * `‑‑with‑file` _file_: Start the file select window with `file` already
   selected. By default no file will be selected. _This must be used with_
   `--with-directory`. It should be the filename of a file within the directory.
+* `--no-utf8`: Do not convert filenames to UTF-8. By default filenames are
+  converted to UTF-8. This option has no effect on GTK.
 
 Return:
 
@@ -408,6 +410,8 @@ Options: (in addition to [global options](#Global.Options))
 * `‑‑with‑file` _file_: Start the file save window with `file` already selected.
   By default no file will be selected. _This must be used with_
   `--with-directory`. It should be the filename of a file within the directory.
+* `--no-utf8`: Do not convert filenames to UTF-8. By default filenames are
+  converted to UTF-8. This option has no effect on GTK.
 
 Return:
 
