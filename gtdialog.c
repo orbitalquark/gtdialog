@@ -723,7 +723,6 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     } else if (type == GTDIALOG_DROPDOWN ||
                type == GTDIALOG_STANDARD_DROPDOWN) {
 #if GTK
-      combobox = gtk_combo_box_text_new();
       combobox = gtk_combo_box_new_text();
       gtk_box_pack_start(GTK_BOX(vbox), combobox, FALSE, TRUE, 5);
       if (exit_onchange)
