@@ -33,9 +33,9 @@ gtDialog only requires GTK+ version 2.16 or higher or ncurses and [CDK][].
 
 ## Download
 
-Download gtDialog from the [project page][].
+Download gtDialog from the project's [download page][].
 
-[project page]: http://foicica.com/gtdialog
+[download page]: http://foicica.com/gtdialog/download
 
 ## Installation and Usage
 
