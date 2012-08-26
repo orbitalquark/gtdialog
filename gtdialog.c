@@ -568,6 +568,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #elif NCURSES
   int cursor = curs_set(1); // enable cursor
   CDKSCREEN *dialog;
+  CDKLABEL *labelt, *labeli;
   CDKENTRY *entry;
   CDKMENTRY *textview;
 //  CDKSLIDER *progressbar;
@@ -621,12 +622,12 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       int nlines;
       if (text) {
         nlines = wrap((char *)text, width - 2, &lines);
-        newCDKLabel(dialog, LEFT, TOP, lines, nlines, FALSE, FALSE);
+        labelt = newCDKLabel(dialog, LEFT, TOP, lines, nlines, FALSE, FALSE);
         free(lines);
       }
       if (info_text) {
         nlines = wrap((char *)info_text, width - 2, &lines);
-        newCDKLabel(dialog, LEFT, CENTER, lines, nlines, FALSE, FALSE);
+        labeli = newCDKLabel(dialog, LEFT, CENTER, lines, nlines, FALSE, FALSE);
         free(lines);
       }
 #endif
@@ -919,8 +920,15 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       out = malloc(3);
       sprintf(out, "%i", response);
     }
-    if (type >= GTDIALOG_INPUTBOX && type != GTDIALOG_FILESELECT &&
-        type != GTDIALOG_FILESAVE && type != GTDIALOG_PROGRESSBAR) {
+    if (type <= GTDIALOG_YESNO_MSGBOX) {
+#if NCURSES
+      if (text)
+        destroyCDKLabel(labelt);
+      if (info_text)
+        destroyCDKLabel(labeli);
+#endif
+    } else if (type >= GTDIALOG_INPUTBOX && type != GTDIALOG_FILESELECT &&
+               type != GTDIALOG_FILESAVE && type != GTDIALOG_PROGRESSBAR) {
       if (response > 0) { // no delete or timeout
         char *txt;
         int created = 0;
