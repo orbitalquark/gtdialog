@@ -588,6 +588,9 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #elif NCURSES
     // There will be a border drawn later, but account for it now.
     dialog = initCDKScreen(newwin(height - 2, width - 2, 2, 2));
+#if LIBRARY
+    tcsetattr(0, TCSANOW, &term);
+#endif
 #endif
     // Create buttons.
     if (type != GTDIALOG_PROGRESSBAR) {
@@ -826,6 +829,9 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                                       GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
 #elif NCURSES
       dialog = initCDKScreen(newwin(height, width, 1, 1));
+#if LIBRARY
+      tcsetattr(0, TCSANOW, &term);
+#endif
       fileselect = newCDKFselect(dialog, LEFT, TOP, 0, 0, (char *)title,
                                  (char *)text, A_NORMAL, '_', A_REVERSE, "</B>",
                                  "</N>", "</N>", "</N>", TRUE, FALSE);
@@ -841,6 +847,9 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                                                      TRUE);
 #elif NCURSES
       dialog = initCDKScreen(newwin(height, width, 1, 1));
+#if LIBRARY
+      tcsetattr(0, TCSANOW, &term);
+#endif
       fileselect = newCDKFselect(dialog, LEFT, TOP, 0, 0, (char *)title,
                                  (char *)text, A_NORMAL, '_', A_REVERSE, "</B>",
                                  "</N>", "</N>", "</N>", TRUE, FALSE);
@@ -1117,9 +1126,6 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   delwin(dialog->window);
   destroyCDKScreen(dialog);
   curs_set(cursor); // restore cursor
-#if LIBRARY
-  tcsetattr(0, TCSANOW, &term);
-#endif
 #endif
   if (!no_newline) {
     char *new_out = malloc(strlen(out) + 2);
