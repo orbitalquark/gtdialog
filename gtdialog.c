@@ -1126,6 +1126,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   delwin(dialog->window);
   destroyCDKScreen(dialog);
   curs_set(cursor); // restore cursor
+  timeout(0), getch(), timeout(-1); // flush input
 #endif
   if (!no_newline) {
     char *new_out = malloc(strlen(out) + 2);
