@@ -861,7 +861,11 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), dir);
     if (filter)
       gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
-    if (file)
+    if (dir && file && type == GTDIALOG_FILESELECT) {
+      char *path = g_strconcat(dir, G_DIR_SEPARATOR_S, file, NULL);
+      gtk_file_chooser_select_filename(GTK_FILE_CHOOSER(dialog), path);
+      g_free(path);
+    } else if (file && type == GTDIALOG_FILESAVE)
       gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), file);
 #elif NCURSES
     if (dir)
