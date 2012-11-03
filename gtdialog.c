@@ -1438,7 +1438,7 @@ int error(int argc, char *argv[]) {
       "      be the filename of a file within the directory.\n";
       "  --no-utf8\n"
       "      Do not convert filenames to UTF-8. By default filenames are converted\n"
-      "      to UTF-8. This option has no effect on GTK."
+      "      to UTF-8. This option has no effect on GTK.";
     break;
   case GTDIALOG_TEXTBOX:
     msg =
