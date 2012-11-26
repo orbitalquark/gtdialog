@@ -31,6 +31,7 @@
 #if GTK
 #include <gtk/gtk.h>
 #elif NCURSES
+#include <unistd.h>
 #ifdef LIBRARY
 #include <termios.h>
 #endif
@@ -577,6 +578,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   CDKSCROLL *scrolled;
   Model model = { ncols, search_col, (char **)items, len, NULL, 0, NULL, NULL };
   CDKFSELECT *fileselect;
+  char cwd[FILENAME_MAX];
+  getcwd(cwd, FILENAME_MAX);
 #endif
   if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE) {
 #if GTK
@@ -1110,6 +1113,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       *out = '\0';
     }
     destroyCDKFselect(fileselect);
+    chdir(cwd);
 #endif
   } else if (type == GTDIALOG_PROGRESSBAR) {
 #if GTK
