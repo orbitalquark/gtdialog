@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Mitchell mitchell.att.foicica.com.
+# Copyright 2009-2013 Mitchell mitchell.att.foicica.com.
 
 ifndef NCURSES
 FLAGS = -DGTK $(shell pkg-config --cflags gtk+-2.0)
