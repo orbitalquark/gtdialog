@@ -131,10 +131,18 @@ static void list_foreach(GtkTreeModel *model, GtkTreePath *path,
   free(value);
 }
 
-static gboolean list_select(GtkTreeView *treeview, gboolean arg1,
-                            gpointer userdata) {
-  g_signal_emit_by_name(userdata, "response", 1);
+static gboolean list_keypress(GtkWidget *treeview, GdkEventKey *event,
+                              gpointer userdata) {
+  if (event->keyval == 0xff0d) { // return key
+    g_signal_emit_by_name(userdata, "response", 1);
+    return TRUE;
+  }
   return FALSE;
+}
+
+static gboolean list_select(GtkTreeView *treeview, GtkTreePath *path,
+                            GtkTreeViewColumn *column, gpointer userdata) {
+  g_signal_emit_by_name(userdata, "response", 1);
 }
 
 static gboolean list_visible(GtkTreeModel *model, GtkTreeIter *iter,
@@ -754,7 +762,9 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       gtk_box_pack_start(GTK_BOX(vbox), scrolled, TRUE, TRUE, 0);
       treeview = gtk_tree_view_new();
       gtk_tree_view_set_enable_search(GTK_TREE_VIEW(treeview), TRUE);
-      g_signal_connect(G_OBJECT(treeview), "select-cursor-row",
+      g_signal_connect(G_OBJECT(treeview), "key-press-event",
+                       G_CALLBACK(list_keypress), (gpointer)dialog);
+      g_signal_connect(G_OBJECT(treeview), "row-activated",
                        G_CALLBACK(list_select), (gpointer)dialog);
       for (i = 0; i < ncols; i++) {
         GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
