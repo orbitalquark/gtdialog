@@ -27,6 +27,10 @@
 #ifndef GTDIALOG_H
 #define GTDIALOG_H
 
+#if GTK
+#include <gtk/gtk.h>
+#endif
+
 enum GTDialogTypes {
   GTDIALOG_MSGBOX,
   GTDIALOG_OK_MSGBOX,
@@ -46,6 +50,9 @@ enum GTDialogTypes {
 
 typedef enum GTDialogTypes GTDialogType;
 
+#if GTK
+void gtdialog_set_parent(GtkWindow *parent);
+#endif
 GTDialogType gtdialog_type(const char *type);
 char *gtdialog(GTDialogType type, int narg, const char *args[]);
 

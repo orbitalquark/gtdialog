@@ -42,8 +42,11 @@
 #include "gtdialog.h"
 
 // Default variables.
-int string_output = 0;
-int output_col = 1, search_col = 1;
+#if GTK
+static GtkWindow *parent = NULL;
+#endif
+static int string_output = 0;
+static int output_col = 1, search_col = 1;
 
 #if GTK
 #define STR_OK "gtk-ok"
@@ -65,6 +68,12 @@ int output_col = 1, search_col = 1;
 #endif
 #endif
 #define copy(s) strcpy(malloc(strlen(s) + 1), s)
+
+#if GTK
+void gtdialog_set_parent(GtkWindow *window) {
+  parent = window;
+}
+#endif
 
 GTDialogType gtdialog_type(const char *type) {
   if (strcmp(type, "msgbox") == 0)
@@ -593,6 +602,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if GTK
     dialog = gtk_dialog_new();
     gtk_window_set_title(GTK_WINDOW(dialog), title);
+    if (parent)
+      gtk_window_set_transient_for(GTK_WINDOW(dialog), parent);
     if (floating)
       gtk_window_set_keep_above(GTK_WINDOW(dialog), TRUE);
     gtk_widget_set_size_request(GTK_WIDGET(dialog), width, height);
@@ -832,7 +843,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   } else {
     if (type == GTDIALOG_FILESELECT) {
 #if GTK
-      dialog = gtk_file_chooser_dialog_new(title, NULL,
+      dialog = gtk_file_chooser_dialog_new(title, parent,
                                            GTK_FILE_CHOOSER_ACTION_OPEN,
                                            GTK_STOCK_CANCEL,
                                            GTK_RESPONSE_CANCEL, GTK_STOCK_OPEN,
@@ -851,7 +862,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
     } else {
 #if GTK
-      dialog = gtk_file_chooser_dialog_new(title, NULL,
+      dialog = gtk_file_chooser_dialog_new(title, parent,
                                            GTK_FILE_CHOOSER_ACTION_SAVE,
                                            GTK_STOCK_CANCEL,
                                            GTK_RESPONSE_CANCEL, GTK_STOCK_SAVE,
