@@ -41,23 +41,27 @@
 
 #include "gtdialog.h"
 
-// Default variables.
 #if GTK
 static GtkWindow *parent = NULL;
 #endif
-static int string_output = 0;
-static int output_col = 1, search_col = 1;
+static int RESPONSE_DELETE = -1, RESPONSE_TIMEOUT = 0, RESPONSE_CHANGE = 4;
+// Options used by other functions.
+static int indeterminate = FALSE, stoppable = FALSE, string_output = FALSE,
+           output_col = 1, search_col = 1;
 
+// Default button labels.
 #if GTK
 #define STR_OK "gtk-ok"
 #define STR_CANCEL "gtk-cancel"
 #define STR_YES "gtk-yes"
 #define STR_NO "gtk-no"
+#define STR_STOP "gtk-stop"
 #elif NCURSES
 #define STR_OK "Ok"
 #define STR_CANCEL "Cancel"
 #define STR_YES "Yes"
 #define STR_NO "No"
+#define STR_STOP "Stop"
 #endif
 
 #if GTK
@@ -70,11 +74,24 @@ static int output_col = 1, search_col = 1;
 #define copy(s) strcpy(malloc(strlen(s) + 1), s)
 
 #if GTK
+/**
+ * Sets the parent window for gtdialogs.
+ * @param window The parent window.
+ */
 void gtdialog_set_parent(GtkWindow *window) {
   parent = window;
 }
 #endif
 
+/**
+ * Returns the GTDialogType for the given type string.
+ * @param type The string dialog type. Acceptable types are "msgbox",
+ *   "ok-msgbox", "yesno-msgbox", "inputbox", "standard-inputbox",
+ *   "secure-inputbox", "secure-standard-inputbox", "fileselect", "filesave",
+ *   "textbox", "progressbar", "dropdown", "standard-dropdown", and
+ *   "filteredlist".
+ * @return GTDialogType or -1
+ */
 GTDialogType gtdialog_type(const char *type) {
   if (strcmp(type, "msgbox") == 0)
     return GTDIALOG_MSGBOX;
@@ -109,188 +126,261 @@ GTDialogType gtdialog_type(const char *type) {
 
 // Callbacks and utility functions.
 #if GTK
+/** Signal for a dropdown selection change. */
 static void close_dropdown(GtkWidget *dropdown, gpointer userdata) {
-  g_signal_emit_by_name(userdata, "response", 4);
+  g_signal_emit_by_name(userdata, "response", RESPONSE_CHANGE);
 }
 
+/** Signal for a keypress in the filteredlist entry. */
 static gboolean entry_keypress(GtkWidget *entry, GdkEventKey *event,
                                gpointer userdata) {
-  GtkTreeModel *model = gtk_tree_view_get_model(GTK_TREE_VIEW(userdata));
+  GtkTreeView *view = GTK_TREE_VIEW(userdata);
+  GtkTreeModel *model = gtk_tree_view_get_model(view);
   gtk_tree_model_filter_refilter(GTK_TREE_MODEL_FILTER(model));
   GtkTreeIter iter;
   if (gtk_tree_model_get_iter_first(model, &iter))
-    gtk_tree_selection_select_iter(
-      gtk_tree_view_get_selection(GTK_TREE_VIEW(userdata)), &iter);
+    gtk_tree_selection_select_iter(gtk_tree_view_get_selection(view), &iter);
   return FALSE;
 }
 
+/** Signal for when stdin is available for the progressbar. */
+static gboolean read_stdin(GIOChannel *ch, GIOCondition cond, gpointer data) {
+  GtkWidget *dialog = (GtkWidget *)data, *box, *progressbar, *button;
+  if (cond == G_IO_IN) {
+    char *input, *p;
+    int status = g_io_channel_read_line(ch, &input, NULL, NULL, NULL);
+    if (status == G_IO_STATUS_NORMAL) {
+      box = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+      GList *children = gtk_container_get_children(GTK_CONTAINER(box));
+      progressbar = (GtkWidget *)children->data;
+      g_list_free(children);
+      p = input;
+      while (!isspace(*p)) p++;
+      *p = '\0', p[strlen(p + 1)] = '\0'; // chomp '\n'
+      if (!indeterminate)
+        gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progressbar),
+                                      0.01 * atoi(input));
+      else
+        gtk_progress_bar_pulse(GTK_PROGRESS_BAR(progressbar));
+      if (*(p + 1))
+        if (stoppable) {
+          box = gtk_dialog_get_action_area(GTK_DIALOG(dialog));
+          children = gtk_container_get_children(GTK_CONTAINER(box));
+          button = (GtkWidget *)children->data;
+          g_list_free(children);
+          if (strcmp(p + 1, "stop enable") == 0)
+            gtk_widget_set_sensitive(button, TRUE);
+          else if (strcmp(p + 1, "stop disable") == 0)
+            gtk_widget_set_sensitive(button, FALSE);
+          else
+            gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), p + 1);
+        } else gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), p + 1);
+      free(input);
+    }
+  } else g_signal_emit_by_name(dialog, "response", 2); // 1 is for Stop pressed
+  return !(cond & G_IO_HUP);
+}
+
+/**
+ * Function for iterating over filteredlist selections.
+ * Concatenates all selections into a single string delimited by newline
+ * characters.
+ */
 static void list_foreach(GtkTreeModel *model, GtkTreePath *path,
                          GtkTreeIter *iter, gpointer userdata) {
   char *value;
-  if (string_output) {
-    gtk_tree_model_get(model, iter, output_col - 1, &value, -1);
-  } else {
-    path =
-      gtk_tree_model_filter_convert_path_to_child_path(
-        GTK_TREE_MODEL_FILTER(model), path);
+  if (!string_output) {
+    GtkTreeModelFilter *filter = GTK_TREE_MODEL_FILTER(model);
+    path = gtk_tree_model_filter_convert_path_to_child_path(filter, path);
     value = gtk_tree_path_to_string(path);
     gtk_tree_path_free(path);
-  }
+  } else gtk_tree_model_get(model, iter, output_col - 1, &value, -1);
   g_string_append_printf((GString *)userdata, "%s\n", value);
   free(value);
 }
 
+/** Signal for the 'enter' key being pressed in the filteredlist view. */
 static gboolean list_keypress(GtkWidget *treeview, GdkEventKey *event,
                               gpointer userdata) {
-  if (event->keyval == 0xff0d) { // return key
-    g_signal_emit_by_name(userdata, "response", 1);
-    return TRUE;
-  }
+  if (event->keyval == 0xff0d) // return key
+    return (g_signal_emit_by_name(userdata, "response", 1), TRUE);
   return FALSE;
 }
 
+/** Signal for a row being activated in the filteredlist view. */
 static gboolean list_select(GtkTreeView *treeview, GtkTreePath *path,
                             GtkTreeViewColumn *column, gpointer userdata) {
   g_signal_emit_by_name(userdata, "response", 1);
 }
 
+/** Function for filtering filterdlist items based on user input. */
 static gboolean list_visible(GtkTreeModel *model, GtkTreeIter *iter,
                              gpointer userdata) {
   const char *entry_text = gtk_entry_get_text(GTK_ENTRY(userdata));
-  if (strlen(entry_text) > 0) {
-    char *text = g_utf8_strdown(entry_text, -1);
-    char *value, *lower, *p;
-    gtk_tree_model_get(model, iter, search_col - 1, &value, -1);
-    lower = g_utf8_strdown(value, -1);
-    p = lower;
-    char **tokens = g_strsplit(text, " ", 0);
-    gboolean visible = TRUE;
-    int i = 0;
-    while (tokens[i] != NULL) {
-      if (!(p = strstr(p, tokens[i]))) {
-        visible = FALSE;
-        break;
-      }
-      p += strlen(tokens[i++]);
+  if (strlen(entry_text) == 0) return TRUE;
+  char *text = g_utf8_strdown(entry_text, -1);
+  char *value, *lower, *p;
+  gtk_tree_model_get(model, iter, search_col - 1, &value, -1);
+  lower = g_utf8_strdown(value, -1), p = lower;
+  char **tokens = g_strsplit(text, " ", 0);
+  gboolean visible = TRUE;
+  int i = 0;
+  while (tokens[i] != NULL) {
+    if (!(p = strstr(p, tokens[i]))) {
+      visible = FALSE;
+      break;
     }
-    free(text);
-    free(value);
-    free(lower);
-    g_strfreev(tokens);
-    return visible;
+    p += strlen(tokens[i++]);
   }
-  return TRUE;
+  free(text), free(value), free(lower);
+  g_strfreev(tokens);
+  return visible;
 }
 
+/** Signal for a dialog timeout. */
 static gboolean timeout_dialog(gpointer userdata) {
-  g_signal_emit_by_name(userdata, "response", 0);
-  return FALSE;
+  return (g_signal_emit_by_name(userdata, "response", RESPONSE_TIMEOUT), FALSE);
 }
 #elif NCURSES
+/**
+ * Returns the number of lines the given string occupies when wrapped to fit the
+ * given number of characters per line and sets the given pointer to the wrapped
+ * set of lines.
+ * The pointer itself must be freed when finished; do not free its contents.
+ * @param str The string to wrap. It is modified in place.
+ * @param w The number of characters per line to wrap at.
+ * @param plines An empty pointer that will ultimately contain the set of
+ *   wrapped lines.
+ * @return int number of wrapped lines
+ */
 static int wrap(char *str, int w, char ***plines) {
-  int i;
-  for (i = w; i < strlen(str); i += w) {
+  // Wrap lines by replacing spaces with '\n' at the appropriate locations.
+  int i, len = strlen(str);
+  for (i = w; i < len; i += w) {
     int j = i;
-    while (j >= 0 && !isspace(str[j]))
-      j--;
-    if (j + w > i) {
-      i = j; // line length is less than w; cut here
-      str[i++] = '\n';
-    }
+    while (j >= 0 && !isspace(str[j])) j--;
+    if (j + w > i) i = j, str[i++] = '\n'; // line length < w; cut here
   }
+  // Count the number of '\n's to get the number of wrapped lines.
   int nlines = 1;
   char *p = str - 1;
-  while ((p = strstr(p + 1, "\n")))
-    nlines++;
+  while ((p = strstr(p + 1, "\n"))) nlines++;
+  // Create the list of lines.
   char **lines = malloc(nlines * sizeof(char *));
   lines[0] = str;
   for (i = 1; i < nlines; i++) {
-    p = strstr(lines[i - 1], "\n");
-    *p = '\0';
+    p = strstr(lines[i - 1], "\n"), *p = '\0';
     lines[i] = p + 1;
   }
   *plines = lines;
   return nlines;
 }
 
+/** Signal for the 'tab' and 'shift+tab' keys being pressed. */
 static int buttonbox_tab(EObjectType cdkType, void *object, void *data,
                          chtype key) {
   injectCDKButtonbox((CDKBUTTONBOX *)data, key);
   return TRUE;
 }
 
+/** The ncurses filteredlist model. */
 typedef struct {
+  /** The number of columns. */
   int ncols;
+  /** The index of the column to filter against. */
   int search_col;
+  /** The raw list of items. */
   char **items;
+  /** The raw number of items. */
   int len;
+  /**
+   * The list of display rows.
+   * The contents of each row are constructed from *items* and *ncols* and
+   * suitable for display to the user.
+   */
   char **rows;
+  /** The number of display rows. */
   int num_rows;
+  /** The list of filtered rows to actually display. */
   char **filtered_rows;
+  /** The CDKENTRY the model is assigned to. */
   CDKENTRY *entry;
+  /** CDKSCROLL the model is assigned to. */
   CDKSCROLL *scrolled;
 } Model;
 
+/**
+ * Returns a copy of the given string converted to lower case.
+ * The returned string must be freed when finished.
+ * @param s The given string to lowercase. It may be freed immediately.
+ */
 static char *strdown(char *s) {
   char *lower = copy(s);
   int i, len = strlen(s);
-  for (i = 0; i < len; i++)
-    lower[i] = tolower(s[i]);
+  for (i = 0; i < len; i++) lower[i] = tolower(s[i]);
   return lower;
 }
 
+/** Signal for a keypress in the filteredlist entry. */
 static int entry_keypress(EObjectType cdkType, void *object, void *data,
                            chtype key) {
   Model *model = (Model *)data;
   char *entry_text = getCDKEntryValue((CDKENTRY *)object);
   if (strlen(entry_text) > 0) {
-    char *text = strdown(entry_text);
-    char **tokens = CDKsplitString(text, ' ');
+    char *text = strdown(entry_text), **tokens = CDKsplitString(text, ' ');
     int i, j, row = 0;
     for (i = 0; i < model->len; i += model->ncols) {
-      char *lower = strdown(model->items[i + model->search_col - 1]);
-      char *p = lower;
-      int visible = 1;
+      char *item = strdown(model->items[i + model->search_col - 1]), *p = item;
+      int visible = TRUE;
       j = 0;
       while (tokens[j] != NULL) {
         if (!(p = strstr(p, tokens[j]))) {
-          visible = 0;
+          visible = FALSE;
           break;
         }
         p += strlen(tokens[j++]);
       }
-      if (visible)
-        model->filtered_rows[row++] = model->rows[i / model->ncols];
-      free(lower);
+      if (visible) model->filtered_rows[row++] = model->rows[i / model->ncols];
+      free(item);
     }
     free(text);
     CDKfreeStrings(tokens);
     setCDKScrollItems(model->scrolled, model->filtered_rows, row, FALSE);
-  } else {
-    setCDKScrollItems(model->scrolled, model->rows, model->len / model->ncols,
-                      FALSE);
-  }
+  } else setCDKScrollItems(model->scrolled, model->rows,
+                           model->len / model->ncols, FALSE);
   HasFocusObj(ObjOf(model->scrolled)) = TRUE; // needed to draw highlight
   eraseCDKScroll(model->scrolled); // drawCDKScroll does not completely redraw
-  drawCDKScroll(model->scrolled, TRUE);
-  drawCDKEntry(model->entry, FALSE);
+  drawCDKScroll(model->scrolled, TRUE), drawCDKEntry(model->entry, FALSE);
   HasFocusObj(ObjOf(model->scrolled)) = FALSE;
   return TRUE;
 }
 
+/**
+ * Creates and returns the set of display rows from the given list of columns,
+ * number of columns, list of items, and number of items.
+ * The returned list and its contents must be freed when finished. Note that the
+ * returned list actually starts at index -1 where a column display row is. That
+ * must be taken into account when freeing.
+ * @param cols The list of column names.
+ * @param ncols The number of columns.
+ * @param items The list of items.
+ * @param len The number of items.
+ */
 static char **item_rows(char **cols, int ncols, char **items, int len) {
+  // Compute the column sizes needed to fit all row items in.
   int *col_widths = malloc(sizeof(int) * ncols);
   int i, j, row_len = 0;
   for (i = 0; i < ncols; i++) {
     int max = strlen(cols[i]);
     for (j = i; j < len; j += ncols) {
       int slen = strlen(items[j]);
-      if (slen > max)
-        max = slen;
+      if (slen > max) max = slen;
     }
-    col_widths[i] = max;
-    row_len += col_widths[i] + 1;
+    col_widths[i] = max, row_len += col_widths[i] + 1;
   }
+  // Generate the display rows, padding row items to fit column widths and
+  // separating columns with '|'s.
+  // The column headers are a special case and need to be underlined too.
   char **new_items = malloc(sizeof(char *) * ((len + ncols - 1) / ncols + 1));
   for (i = -ncols; i < len; i += ncols) {
     char *new_item = malloc((i < 0) ? row_len + 4 : row_len);
@@ -299,18 +389,17 @@ static char **item_rows(char **cols, int ncols, char **items, int len) {
       char *item = (i < 0) ? cols[j - i] : items[j];
       p = stpcpy(p, item);
       int padding = col_widths[j - i] - strlen(item);
-      while (padding-- > 0)
-        *p++ = ' ';
+      while (padding-- > 0) *p++ = ' ';
       *p++ = (i < 0) ? '|' : ' ';
     }
-    if (p > new_item)
-      *(p - 1) = '\0';
+    if (p > new_item) *(p - 1) = '\0';
     new_items[i / ncols + 1] = new_item;
   }
   free(col_widths);
   return &new_items[1]; // items start here
 }
 
+/** Signal for a scrolling keypress in the filteredlist entry. */
 static int scrolled_key(EObjectType cdkType, void *object, void *data,
                         chtype key) {
   HasFocusObj(ObjOf((CDKSCROLL *)data)) = TRUE; // needed to draw highlight
@@ -320,159 +409,126 @@ static int scrolled_key(EObjectType cdkType, void *object, void *data,
 }
 #endif
 
+/**
+ * Creates, displays, and returns the result from a gtdialog of the given type
+ * from the given set of parameters.
+ * The string returned must be freed when finished.
+ * @param type The GTDialogType type.
+ * @param narg The number of parameters in *args*.
+ * @param args The set of parameters for the dialog.
+ * @return string result
+ */
 char *gtdialog(GTDialogType type, int narg, const char *args[]) {
-  int RESPONSE_DELETE = -1; // timeout is 0
-  char *out = NULL;
-
 #if NCURSES && LIBRARY
   struct termios term;
-  tcgetattr(0, &term);
+  tcgetattr(0, &term); // store initial terminal settings
 #endif
 
-  // Default variables.
-  int height = -1, floating = 0, no_newline = 0, timeout = 0, width = -1;
-  const char *title = "gtdialog";
-  string_output = 0;
-
-  // Dialog-specific variables.
-  int editable = 0, exit_onchange = 0, focus_textbox = 0, indeterminate = 0,
-      no_show = 0, percent = 0, multiple = 0, only_dirs = 0, selected = 0,
-      no_utf8 = 0;
+  // Dialog options.
+  int editable = FALSE, exit_onchange = FALSE, floating = FALSE,
+      focus_textbox = FALSE, height = -1, no_create_dirs = FALSE,
+      no_newline = FALSE, no_show = FALSE, no_utf8 = FALSE, percent = 0,
+      select_multiple = FALSE, select_only_dirs = FALSE, select = 0,
+      selected = FALSE, timeout = 0, width = -1;
+  indeterminate = FALSE, stoppable = FALSE, string_output = FALSE;
+  output_col = 1, search_col = 1;
   const char *buttons[3] = { NULL, NULL, NULL}, **cols = NULL,
              *info_text = NULL, **items = NULL, *scroll_to = "top",
-             *text = NULL, *dir = NULL, *file = NULL;
+             *text = NULL, *text_file = NULL, *title = "gtdialog",
+             *with_dir = NULL, *with_file = NULL;
+  // Other variables.
   int ncols = 0, len = 0;
 #if GTK
   PangoFontDescription *font = NULL;
   GtkFileFilter *filter = NULL;
 #endif
-  output_col = 1;
-  search_col = 1;
 
-  // Set dialog defaults.
+  // Dialog defaults.
 #if NCURSES
-  width = 40;
-  height = 10;
+  height = 10, width = 40;
 #endif
-  if (type == GTDIALOG_MSGBOX) {
+  if (type == GTDIALOG_MSGBOX)
     buttons[0] = STR_OK;
-  } else if (type == GTDIALOG_OK_MSGBOX) {
+  else if (type == GTDIALOG_OK_MSGBOX)
+    buttons[0] = STR_OK, buttons[1] = STR_CANCEL;
+  else if (type == GTDIALOG_YESNO_MSGBOX)
+    buttons[0] = STR_YES, buttons[1] = STR_NO, buttons[2] = STR_CANCEL;
+  else if (type == GTDIALOG_INPUTBOX || type == GTDIALOG_SECURE_INPUTBOX)
     buttons[0] = STR_OK;
-    buttons[1] = STR_CANCEL;
-  } else if (type == GTDIALOG_YESNO_MSGBOX) {
-    buttons[0] = STR_YES;
-    buttons[1] = STR_NO;
-    buttons[2] = STR_CANCEL;
-  } else if (type >= GTDIALOG_INPUTBOX &&
-             type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
-    buttons[0] = STR_OK;
-    if (type == GTDIALOG_STANDARD_INPUTBOX ||
-        type == GTDIALOG_SECURE_STANDARD_INPUTBOX)
-      buttons[1] = STR_CANCEL;
-  } else if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE) {
+  else if (type == GTDIALOG_STANDARD_INPUTBOX ||
+           type == GTDIALOG_SECURE_STANDARD_INPUTBOX)
+    buttons[0] = STR_OK, buttons[1] = STR_CANCEL;
 #if NCURSES
+  else if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
     height = 20;
 #endif
-  } else if (type == GTDIALOG_TEXTBOX) {
+  else if (type == GTDIALOG_TEXTBOX)
 #if GTK
-    width = 400;
-    height = 300;
+    height = 300, width = 400, buttons[0] = STR_OK;
 #elif NCURSES
-    height = 20;
+    height = 20, buttons[0] = STR_OK;
 #endif
+  else if (type == GTDIALOG_PROGRESSBAR)
+    buttons[0] = STR_STOP;
+  else if (type == GTDIALOG_DROPDOWN)
     buttons[0] = STR_OK;
-  } else if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN) {
-    buttons[0] = STR_OK;
-    if (type == GTDIALOG_STANDARD_DROPDOWN)
-      buttons[1] = STR_CANCEL;
-  } else if (type == GTDIALOG_FILTEREDLIST) {
+  else if (type == GTDIALOG_STANDARD_DROPDOWN)
+    buttons[0] = STR_OK, buttons[1] = STR_CANCEL;
+  else if (type == GTDIALOG_FILTEREDLIST)
 #if GTK
-    width = 500;
-    height = 360;
+    height = 360, width = 500, buttons[0] = STR_OK;
 #elif NCURSES
-    height = 20;
+    height = 20, buttons[0] = STR_OK;
 #endif
-    buttons[0] = STR_OK;
-  }
 
   // Parse arguments.
   int i = 0;
   const char *arg = args[i++];
   while (arg && i <= narg) {
-    int get_next_arg = 1;
-    // Default options.
-    if (strcmp(arg, "--debug") == 0) {
-      // not implemented
-    } else if (strcmp(arg, "--height") == 0) {
-      int h = atoi(args[i++]);
-      if (h > 0)
-        height = h;
-    } else if (strcmp(arg, "--help") == 0) {
-      // not implemented
-    } else if (strcmp(arg, "--no-newline") == 0) {
-      no_newline = 1;
-    } else if (strcmp(arg, "--string-output") == 0) {
-      string_output = 1;
-    } else if (strcmp(arg, "--title") == 0) {
-      title = args[i++];
-    } else if (strcmp(arg, "--width") == 0) {
-      int w = atoi(args[i++]);
-      if (w > 0)
-        width = w;
-    // Dialog-specific options
-    } else if (strcmp(arg, "--button1") == 0) {
+    if (strcmp(arg, "--button1") == 0) {
       if (type == GTDIALOG_MSGBOX || type == GTDIALOG_INPUTBOX ||
           type == GTDIALOG_TEXTBOX || type == GTDIALOG_DROPDOWN ||
-          type == GTDIALOG_FILTEREDLIST)
-        buttons[0] = args[i++];
+          type == GTDIALOG_FILTEREDLIST) buttons[0] = args[i++];
     } else if (strcmp(arg, "--button2") == 0) {
       if (type == GTDIALOG_MSGBOX || type == GTDIALOG_INPUTBOX ||
           type == GTDIALOG_TEXTBOX || type == GTDIALOG_DROPDOWN ||
-          type == GTDIALOG_FILTEREDLIST)
-        buttons[1] = args[i++];
+          type == GTDIALOG_FILTEREDLIST) buttons[1] = args[i++];
     } else if (strcmp(arg, "--button3") == 0) {
       if (type == GTDIALOG_MSGBOX || type == GTDIALOG_INPUTBOX ||
           type == GTDIALOG_TEXTBOX || type == GTDIALOG_DROPDOWN ||
-          type == GTDIALOG_FILTEREDLIST)
-        buttons[2] = args[i++];
+          type == GTDIALOG_FILTEREDLIST) buttons[2] = args[i++];
     } else if (strcmp(arg, "--columns") == 0) {
       if (type == GTDIALOG_FILTEREDLIST) {
-        cols = &args[i];
-        ncols = 0;
-        while (i < narg && strncmp(args[i], "--", 2) != 0)
-          ncols++, i++;
+        cols = &args[i], ncols = 0;
+        while (i < narg && strncmp(args[i], "--", 2) != 0) ncols++, i++;
       }
     } else if (strcmp(arg, "--editable") == 0) {
-      if (type == GTDIALOG_TEXTBOX)
-        editable = 1;
+      if (type == GTDIALOG_TEXTBOX) editable = TRUE;
     } else if (strcmp(arg, "--exit-onchange") == 0) {
       if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN)
-        exit_onchange = 1;
+        exit_onchange = TRUE;
     } else if (strcmp(arg, "--float") == 0) {
       if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
-          type != GTDIALOG_PROGRESSBAR)
-        floating = 1;
+          type != GTDIALOG_PROGRESSBAR) floating = TRUE;
     } else if (strcmp(arg, "--focus-textbox") == 0) {
-      if (type == GTDIALOG_TEXTBOX)
-        focus_textbox = 1;
-     } else if (strcmp(arg, "--icon") == 0) {
+      if (type == GTDIALOG_TEXTBOX) focus_textbox = TRUE;
+    } else if (strcmp(arg, "--height") == 0) {
+      int h = atoi(args[i++]);
+      if (h > 0) height = h;
+    } else if (strcmp(arg, "--icon") == 0) {
       //if (type >= GTDIALOG_MSGBOX && type <= GTDIALOG_YESNO_MSGBOX)
-        // not implemented
+        // TODO: not implemented
     } else if (strcmp(arg, "--icon-file") == 0) {
       //if (type >= GTDIALOG_MSGBOX && type <= GTDIALOG_YESNO_MSGBOX)
-        // not implemented
+        // TODO: not implemented
     } else if (strcmp(arg, "--indeterminate") == 0) {
-      if (type == GTDIALOG_PROGRESSBAR)
-        indeterminate = 1;
+      if (type == GTDIALOG_PROGRESSBAR) indeterminate = TRUE;
     } else if (strcmp(arg, "--informative-text") == 0) {
       if (type < GTDIALOG_FILESELECT || type == GTDIALOG_TEXTBOX ||
-          type == GTDIALOG_FILTEREDLIST)
-        info_text = args[i++];
+          type == GTDIALOG_FILTEREDLIST) info_text = args[i++];
     } else if (strcmp(arg, "--items") == 0) {
-      items = &args[i];
-      len = 0;
-      while (i < narg && strncmp(args[i], "--", 2) != 0)
-        len++, i++;
+      items = &args[i], len = 0;
+      while (i < narg && strncmp(args[i], "--", 2) != 0) len++, i++;
     } else if (strcmp(arg, "--monospaced-font") == 0) {
 #if GTK
       if (type == GTDIALOG_TEXTBOX) {
@@ -481,24 +537,22 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       }
 #endif
     } else if (strcmp(arg, "--no-cancel") == 0) {
-      if (type == GTDIALOG_YESNO_MSGBOX) {
-        buttons[2] = NULL;
-      } else if (type == GTDIALOG_OK_MSGBOX ||
-                 type == GTDIALOG_STANDARD_INPUTBOX ||
-                 type == GTDIALOG_SECURE_STANDARD_INPUTBOX ||
-                 type == GTDIALOG_STANDARD_DROPDOWN) {
+      if (type == GTDIALOG_OK_MSGBOX || type == GTDIALOG_STANDARD_INPUTBOX ||
+          type == GTDIALOG_SECURE_STANDARD_INPUTBOX ||
+          type == GTDIALOG_STANDARD_DROPDOWN)
         buttons[1] = NULL;
-      }
+      else if (type == GTDIALOG_YESNO_MSGBOX)
+        buttons[2] = NULL;
     } else if (strcmp(arg, "--no-create-directories") == 0) {
-      //if (type == GTDIALOG_FILESAVE)
-        // not implemented
+      if (type == GTDIALOG_FILESAVE) no_create_dirs = TRUE;
+    } else if (strcmp(arg, "--no-newline") == 0) {
+      no_newline = TRUE;
     } else if (strcmp(arg, "--no-show") == 0) {
       if (type >= GTDIALOG_INPUTBOX &&
-          type <= GTDIALOG_SECURE_STANDARD_INPUTBOX)
-        no_show = 1;
+          type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) no_show = TRUE;
     } else if (strcmp(arg, "--no-utf8") == 0) {
       if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
-        no_utf8 = 1;
+        no_utf8 = TRUE;
     } else if (strcmp(arg, "--output-column") == 0) {
       if (type == GTDIALOG_FILTEREDLIST) {
         output_col = atoi(args[i++]);
@@ -507,20 +561,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         else if (output_col < 1)
           output_col = 1;
       }
-    } else if (strcmp(arg, "--packages-as-directories") == 0) {
-      //if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
-        // not implemented
     } else if (strcmp(arg, "--percent") == 0) {
-      if (type == GTDIALOG_PROGRESSBAR)
-        percent = atoi(args[i++]);
-    } else if (strcmp(arg, "--pulldown") == 0) {
-      //if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN)
-        // not implemented
+      if (type == GTDIALOG_PROGRESSBAR) percent = atoi(args[i++]);
     } else if (strcmp(arg, "--scroll-to") == 0) {
-      if (type == GTDIALOG_TEXTBOX) {
-        focus_textbox = 1;
-        scroll_to = args[i++];
-      }
+      if (type == GTDIALOG_TEXTBOX) focus_textbox = TRUE, scroll_to = args[i++];
     } else if (strcmp(arg, "--search-column") == 0) {
       if (type == GTDIALOG_FILTEREDLIST) {
         search_col = atoi(args[i++]);
@@ -529,54 +573,57 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         else if (search_col < 1)
           search_col = 1;
       }
-    } else if (strcmp(arg, "--select-directories") == 0) {
-      //if (type == GTDIALOG_FILESELECT)
-        // not implemented
     } else if (strcmp(arg, "--select-multiple") == 0) {
       if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILTEREDLIST)
-        multiple = 1;
+        select_multiple = TRUE;
     } else if (strcmp(arg, "--select-only-directories") == 0) {
-      if (type == GTDIALOG_FILESELECT)
-        only_dirs = 1;
+      if (type == GTDIALOG_FILESELECT) select_only_dirs = TRUE;
+    } else if (strcmp(arg, "--select") == 0) {
+      if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN)
+        select = atoi(args[i++]);
     } else if (strcmp(arg, "--selected") == 0) {
-      if (type == GTDIALOG_TEXTBOX)
-        selected = 1;
-      else if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN)
-        selected = atoi(args[i++]);
+      if (type == GTDIALOG_TEXTBOX) selected = TRUE;
+    } else if (strcmp(arg, "--stoppable") == 0) {
+      if (type == GTDIALOG_PROGRESSBAR) stoppable = TRUE;
+    } else if (strcmp(arg, "--string-output") == 0) {
+      string_output = TRUE;
     } else if (strcmp(arg, "--text") == 0) {
-        text = args[i++];
+      text = args[i++];
     } else if (strcmp(arg, "--text-from-file") == 0) {
-      if (type == GTDIALOG_TEXTBOX)
-        file = args[i++];
+      if (type == GTDIALOG_TEXTBOX) text_file = args[i++];
     } else if (strcmp(arg, "--timeout") == 0) {
       if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
-          type != GTDIALOG_PROGRESSBAR)
-        timeout = atoi(args[i++]);
+          type != GTDIALOG_PROGRESSBAR) timeout = atoi(args[i++]);
+    } else if (strcmp(arg, "--title") == 0) {
+      title = args[i++];
+    } else if (strcmp(arg, "--width") == 0) {
+      int w = atoi(args[i++]);
+      if (w > 0) width = w;
     } else if (strcmp(arg, "--with-directory") == 0) {
       if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
-        dir = args[i++];
+        with_dir = args[i++];
     } else if (strcmp(arg, "--with-extension") == 0) {
       if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE) {
 #if GTK
         filter = gtk_file_filter_new();
 #endif
-        const char *ext = args[i++];
-        while (ext && strncmp(ext, "--", 2) != 0) {
+        while (i < narg && strncmp(args[i], "--", 2) != 0) {
 #if GTK
+          const char *ext = args[i];
           char *glob = g_strconcat((*ext == '.') ? "*" : "*.", ext, NULL);
           gtk_file_filter_add_pattern(filter, glob);
           g_free(glob);
+#elif NCURSES
+          // TODO:
 #endif
-          ext = args[i++];
+          i++;
         }
-        get_next_arg = 0;
-        arg = ext;
       }
     } else if (strcmp(arg, "--with-file") == 0) {
       if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
-        file = args[i++];
+        with_file = args[i++];
     }
-    if (get_next_arg) arg = args[i++];
+    arg = args[i++];
   }
 
   // Create dialog.
@@ -602,20 +649,18 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if GTK
     dialog = gtk_dialog_new();
     gtk_window_set_title(GTK_WINDOW(dialog), title);
-    if (parent)
-      gtk_window_set_transient_for(GTK_WINDOW(dialog), parent);
-    if (floating)
-      gtk_window_set_keep_above(GTK_WINDOW(dialog), TRUE);
+    if (parent) gtk_window_set_transient_for(GTK_WINDOW(dialog), parent);
+    if (floating) gtk_window_set_keep_above(GTK_WINDOW(dialog), TRUE);
     gtk_widget_set_size_request(GTK_WIDGET(dialog), width, height);
 #elif NCURSES
     // There will be a border drawn later, but account for it now.
     dialog = initCDKScreen(newwin(height - 2, width - 2, 2, 2));
 #if LIBRARY
-    tcsetattr(0, TCSANOW, &term);
+    tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
 #endif
 #endif
     // Create buttons.
-    if (type != GTDIALOG_PROGRESSBAR) {
+    if (type != GTDIALOG_PROGRESSBAR || stoppable) {
 #if GTK
       for (i = 3; i > 0; i--)
         if (buttons[i - 1])
@@ -623,9 +668,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       gtk_dialog_set_default_response(GTK_DIALOG(dialog), 1);
 #elif NCURSES
       int nbuttons = 0;
-      for (i = 0; i < 3; i++)
-        if (buttons[i])
-          nbuttons++;
+      for (i = 0; i < 3; i++) if (buttons[i]) nbuttons++;
       buttonbox = newCDKButtonbox(dialog, 0, BOTTOM, 1, 0, "", 1, nbuttons,
                                   (char **)buttons, nbuttons, A_REVERSE, TRUE,
                                   FALSE);
@@ -635,9 +678,9 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     // Create dialog content.
 #if GTK
     GtkWidget *vbox = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
-    if (text)
+    if (text && type != GTDIALOG_PROGRESSBAR)
       gtk_box_pack_start(GTK_BOX(vbox), gtk_label_new(text), FALSE, TRUE, 5);
-    if (info_text)
+    if (info_text && type != GTDIALOG_PROGRESSBAR)
       gtk_box_pack_start(GTK_BOX(vbox), gtk_label_new(info_text), FALSE, TRUE,
                          5);
 #endif
@@ -664,18 +707,15 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       gtk_box_pack_start(GTK_BOX(vbox), entry, FALSE, TRUE, 5);
       if (type >= GTDIALOG_SECURE_INPUTBOX || no_show)
         gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
-      if (text)
-        gtk_entry_set_text(GTK_ENTRY(entry), text);
+      if (text) gtk_entry_set_text(GTK_ENTRY(entry), text);
 #elif NCURSES
       EDisplayType display = vMIXED;
-      if (type >= GTDIALOG_SECURE_INPUTBOX || no_show)
-        display = vHMIXED;
+      if (type >= GTDIALOG_SECURE_INPUTBOX || no_show) display = vHMIXED;
       entry = newCDKEntry(dialog, LEFT, TOP, (char *)title, (char *)info_text,
                           A_NORMAL, '_', display, 0, 0, 100, FALSE, FALSE);
       bindCDKObject(vENTRY, entry, KEY_TAB, buttonbox_tab, buttonbox);
       bindCDKObject(vENTRY, entry, KEY_BTAB, buttonbox_tab, buttonbox);
-      if (text)
-        setCDKEntryValue(entry, (char *)text);
+      if (text) setCDKEntryValue(entry, (char *)text);
 #endif
     } else if (type == GTDIALOG_TEXTBOX) {
 #if GTK
@@ -689,28 +729,23 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                                      GTK_POLICY_AUTOMATIC,
                                      GTK_POLICY_AUTOMATIC);
       gtk_box_pack_start(GTK_BOX(vbox), scrolled, TRUE, TRUE, 5);
-      if (font)
-        gtk_widget_modify_font(textview, font);
+      if (font) gtk_widget_modify_font(textview, font);
       GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview));
-      if (text)
-        gtk_text_buffer_set_text(buffer, text, strlen(text));
+      if (text) gtk_text_buffer_set_text(buffer, text, strlen(text));
 #elif NCURSES
       EDisplayType display = editable ? vVIEWONLY : vMIXED;
       textview = newCDKMentry(dialog, LEFT, TOP, (char *)title,
                               (char *)info_text, A_NORMAL, '_', display, 0,
                               height - 8, height - 8, 0, FALSE, FALSE);
-      if (text)
-        setCDKMentryValue(textview, (char *)text);
+      if (text) setCDKMentryValue(textview, (char *)text);
 #endif
-      if (file) {
-        FILE *f = fopen(file, "r");
+      if (text_file) {
+        FILE *f = fopen(text_file, "r");
         if (f) {
           fseek(f, 0, SEEK_END);
           int len = ftell(f);
           char *buf = malloc(len + 1);
-          rewind(f);
-          fread(buf, 1, len, f);
-          buf[len] = '\0';
+          rewind(f), fread(buf, 1, len, f), buf[len] = '\0';
 #if GTK
           gtk_text_buffer_set_text(buffer, buf, len);
 #elif NCURSES
@@ -739,11 +774,12 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if GTK
       progressbar = gtk_progress_bar_new();
       gtk_box_pack_start(GTK_BOX(vbox), progressbar, FALSE, TRUE, 5);
-      if (percent)
+      if (!indeterminate && percent)
         gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progressbar),
                                       0.01 * percent);
-      if (text)
-        gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), text);
+      else if (indeterminate)
+        gtk_progress_bar_pulse(GTK_PROGRESS_BAR(progressbar));
+      if (text) gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), text);
 #elif NCURSES
 #endif
     } else if (type == GTDIALOG_DROPDOWN ||
@@ -756,15 +792,14 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                          G_CALLBACK(close_dropdown), (gpointer)dialog);
       for (i = 0; i < len; i++)
         gtk_combo_box_append_text(GTK_COMBO_BOX(combobox), items[i]);
-      gtk_combo_box_set_active(GTK_COMBO_BOX(combobox), selected);
+      gtk_combo_box_set_active(GTK_COMBO_BOX(combobox), select);
 #elif NCURSES
       combobox = newCDKItemlist(dialog, LEFT, TOP, (char *)title,
                                 (char *)info_text, (char **)items, len, 0,
                                 FALSE, FALSE);
 #endif
     } else if (type == GTDIALOG_FILTEREDLIST) {
-      if (ncols == 0)
-        return copy("Error: --columns not given.\n");
+      if (ncols == 0) return copy("Error: --columns not given.\n");
 #if GTK
       entry = gtk_entry_new();
       gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
@@ -779,15 +814,14 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                        G_CALLBACK(list_select), (gpointer)dialog);
       for (i = 0; i < ncols; i++) {
         GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
-        GtkTreeViewColumn *treecol =
-          gtk_tree_view_column_new_with_attributes(cols[i], renderer, "text", i,
-                                                   NULL);
+        GtkTreeViewColumn *treecol = NULL;
+        treecol = gtk_tree_view_column_new_with_attributes(cols[i], renderer,
+                                                           "text", i, NULL);
         gtk_tree_view_column_set_sizing(treecol, GTK_TREE_VIEW_COLUMN_AUTOSIZE);
         gtk_tree_view_append_column(GTK_TREE_VIEW(treeview), treecol);
       }
       GType *cols = g_new0(GType, ncols);
-      for (i = 0; i < ncols; i++)
-        cols[i] = G_TYPE_STRING;
+      for (i = 0; i < ncols; i++) cols[i] = G_TYPE_STRING;
       list = gtk_list_store_newv(ncols, cols);
       free(cols);
       GtkTreeModel *filter = gtk_tree_model_filter_new(GTK_TREE_MODEL(list),
@@ -799,20 +833,17 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       g_signal_connect(G_OBJECT(entry), "key-release-event",
                        G_CALLBACK(entry_keypress), (gpointer)treeview);
       gtk_container_add(GTK_CONTAINER(scrolled), treeview);
-      if (multiple)
+      if (select_multiple)
         gtk_tree_selection_set_mode(
           gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview)),
                                       GTK_SELECTION_MULTIPLE);
-      if (text)
-        gtk_entry_set_text(GTK_ENTRY(entry), text);
+      if (text) gtk_entry_set_text(GTK_ENTRY(entry), text);
       int col = 0;
       GtkTreeIter iter;
       for (i = 0; i < len; i++) {
-        if (col == 0)
-          gtk_list_store_append(list, &iter);
+        if (col == 0) gtk_list_store_append(list, &iter);
         gtk_list_store_set(list, &iter, col++, items[i], -1);
-        if (col == ncols)
-          col = 0; // new row
+        if (col == ncols) col = 0; // new row
       }
 #elif NCURSES
       entry = newCDKEntry(dialog, LEFT, TOP, (char *)title, (char *)info_text,
@@ -821,13 +852,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       int num_rows = (len + ncols - 1) / ncols; // account for non-full rows
       scrolled = newCDKScroll(dialog, LEFT, CENTER, RIGHT, -6, 0, rows[-1],
                               rows, num_rows, FALSE, A_REVERSE, TRUE, FALSE);
-      model.rows = rows;
-      model.num_rows = num_rows;
+      model.rows = rows, model.num_rows = num_rows;
       model.filtered_rows = malloc(sizeof(char *) * num_rows);
-      for (i = 0; i < num_rows; i++)
-        model.filtered_rows[i] = model.rows[i];
-      model.entry = entry;
-      model.scrolled = scrolled;
+      for (i = 0; i < num_rows; i++) model.filtered_rows[i] = model.rows[i];
+      model.entry = entry, model.scrolled = scrolled;
       bindCDKObject(vENTRY, entry, KEY_TAB, buttonbox_tab, buttonbox);
       bindCDKObject(vENTRY, entry, KEY_BTAB, buttonbox_tab, buttonbox);
       bindCDKObject(vENTRY, entry, KEY_UP, scrolled_key, scrolled);
@@ -836,8 +864,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       bindCDKObject(vENTRY, entry, KEY_NPAGE, scrolled_key, scrolled);
       setCDKEntryPostProcess(entry, entry_keypress, &model);
       // TODO: commands to scroll the list to the right and left.
-      if (text)
-        setCDKEntryValue(entry, (char *)text);
+      if (text) setCDKEntryValue(entry, (char *)text);
 #endif
     }
   } else {
@@ -848,13 +875,13 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                                            GTK_STOCK_CANCEL,
                                            GTK_RESPONSE_CANCEL, GTK_STOCK_OPEN,
                                            GTK_RESPONSE_ACCEPT, NULL);
-      if (only_dirs)
+      if (select_only_dirs)
           gtk_file_chooser_set_action(GTK_FILE_CHOOSER(dialog),
                                       GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
 #elif NCURSES
       dialog = initCDKScreen(newwin(height, width, 1, 1));
 #if LIBRARY
-      tcsetattr(0, TCSANOW, &term);
+      tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
 #endif
       fileselect = newCDKFselect(dialog, LEFT, TOP, 0, 0, (char *)title,
                                  (char *)text, A_NORMAL, '_', A_REVERSE, "</B>",
@@ -869,10 +896,12 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                                            GTK_RESPONSE_ACCEPT, NULL);
       gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog),
                                                      TRUE);
+      if (no_create_dirs)
+        gtk_file_chooser_set_create_folders(GTK_FILE_CHOOSER(dialog), FALSE);
 #elif NCURSES
       dialog = initCDKScreen(newwin(height, width, 1, 1));
 #if LIBRARY
-      tcsetattr(0, TCSANOW, &term);
+      tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
 #endif
       fileselect = newCDKFselect(dialog, LEFT, TOP, 0, 0, (char *)title,
                                  (char *)text, A_NORMAL, '_', A_REVERSE, "</B>",
@@ -880,22 +909,21 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
     }
 #if GTK
-    gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), multiple);
-    if (dir)
-      gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), dir);
-    if (filter)
-      gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
-    if (dir && file && type == GTDIALOG_FILESELECT) {
-      char *path = g_strconcat(dir, G_DIR_SEPARATOR_S, file, NULL);
+    gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog),
+                                         select_multiple);
+    if (with_dir)
+      gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), with_dir);
+    if (filter) gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
+    if (with_dir && with_file && type == GTDIALOG_FILESELECT) {
+      char *path = g_strconcat(with_dir, G_DIR_SEPARATOR_S, with_file, NULL);
       gtk_file_chooser_select_filename(GTK_FILE_CHOOSER(dialog), path);
       g_free(path);
-    } else if (file && type == GTDIALOG_FILESAVE)
-      gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), file);
+    } else if (with_file && type == GTDIALOG_FILESAVE)
+      gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), with_file);
 #elif NCURSES
-    if (dir)
-      setCDKFselectDirectory(fileselect, (char *)dir);
-    if (file) {
-      char *dir = dirName((char *)file);
+    if (with_dir) setCDKFselectDirectory(fileselect, (char *)with_dir);
+    if (with_file) {
+      char *dir = dirName((char *)with_file);
       setCDKFselectDirectory(fileselect, (char *)dir);
       // TODO: select file in the list.
       free(dir);
@@ -906,7 +934,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   gtk_window_set_wmclass(GTK_WINDOW(dialog), "gtdialog", "gtdialog");
 #endif
 
-  // Run dialog; text output is stored in 'out'
+  // Run dialog, storing output in 'out'.
+  char *out = NULL;
   if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
       type != GTDIALOG_PROGRESSBAR) {
 #if GTK
@@ -914,8 +943,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     if (timeout)
       g_timeout_add_seconds(timeout, timeout_dialog, (gpointer)dialog);
     int response = gtk_dialog_run(GTK_DIALOG(dialog));
-    if (response == -4)
-      response = RESPONSE_DELETE;
+    if (response == GTK_RESPONSE_DELETE_EVENT) response = RESPONSE_DELETE;
 #elif NCURSES
     WINDOW *border = newwin(height, width, 1, 1);
     box(border, 0, 0), wrefresh(border);
@@ -941,45 +969,37 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                                               : RESPONSE_DELETE;
     } else {
       response = 1 + activateCDKButtonbox(buttonbox, NULL);
-      if (response == 0) // activateCDKButtonbox returns -1 on escape
-        response = RESPONSE_DELETE;
+      // activateCDKButtonbox returns -1 on escape so check for response == 0.
+      if (response == 0) response = RESPONSE_DELETE;
     }
     wborder(border, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '), wrefresh(border);
     delwin(border);
     destroyCDKButtonbox(buttonbox);
 #endif
-    if (string_output && response > 0 && response <= 3) {
-      int len = strlen(buttons[response - 1]);
-      out = malloc(len + 1);
-      strncpy(out, buttons[response - 1], len);
-      out[len] = '\0';
-    } else {
-      out = malloc(3);
-      sprintf(out, "%i", response);
-    }
+    if (string_output && response > 0 && response <= 3)
+      out = copy(buttons[response - 1]);
+    else
+      out = malloc(3), sprintf(out, "%i", response);
     if (type <= GTDIALOG_YESNO_MSGBOX) {
 #if NCURSES
-      if (text)
-        destroyCDKLabel(labelt);
-      if (info_text)
-        destroyCDKLabel(labeli);
+      if (text) destroyCDKLabel(labelt);
+      if (info_text) destroyCDKLabel(labeli);
 #endif
     } else if (type >= GTDIALOG_INPUTBOX && type != GTDIALOG_FILESELECT &&
                type != GTDIALOG_FILESAVE && type != GTDIALOG_PROGRESSBAR) {
-      if (response > 0) { // no delete or timeout
-        char *txt;
-        int created = 0;
+      if (response > RESPONSE_TIMEOUT) {
+        char *txt = "";
+        int created = FALSE;
         if (type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
 #if GTK
           txt = (char *)gtk_entry_get_text(GTK_ENTRY(entry));
 #elif NCURSES
-          txt = copy(getCDKEntryValue(entry));
-          created = 1;
+          txt = copy(getCDKEntryValue(entry)), created = TRUE;
           destroyCDKEntry(entry);
 #endif
-        } else if (type == GTDIALOG_TEXTBOX) {
+        } else if (type == GTDIALOG_TEXTBOX && editable) {
 #if GTK
-          GtkTextBuffer *buffer =
+          GtkTextBuffer *buffer = //TODO: reformat
             gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview));
           GtkTextIter s, e;
           gtk_text_buffer_get_start_iter(buffer, &s);
@@ -990,8 +1010,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
             pango_font_description_free(font);
           }
 #elif NCURSES
-          txt = copy(getCDKMentryValue(textview));
-          created = 1;
+          txt = copy(getCDKMentryValue(textview)), created = TRUE;
           destroyCDKMentry(textview);
 #endif
         } else if (type == GTDIALOG_DROPDOWN ||
@@ -1002,12 +1021,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #elif NCURSES
             if (len > 0)
               txt = (char *)items[getCDKItemlistCurrentItem(combobox)];
-            else
-              txt = "";
             destroyCDKItemlist(combobox);
 #endif
           } else {
-            txt = malloc(4);
+            txt = malloc(4), created = TRUE;
             sprintf(txt, "%i",
 #if GTK
                     gtk_combo_box_get_active(GTK_COMBO_BOX(combobox)));
@@ -1015,7 +1032,6 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                     getCDKItemlistCurrentItem(combobox));
             destroyCDKItemlist(combobox);
 #endif
-            created = 1;
           }
         } else if (type == GTDIALOG_FILTEREDLIST) {
 #if GTK
@@ -1023,11 +1039,9 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           gtk_tree_selection_selected_foreach(
             gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview)), list_foreach,
                                         gstr);
-          txt = copy(gstr->str);
-          if (strlen(txt) > 0)
-            txt[strlen(txt) - 1] = '\0'; // chomp '\n'
+          txt = copy(gstr->str), created = TRUE;
+          if (strlen(txt) > 0) txt[strlen(txt) - 1] = '\0'; // chomp '\n'
           g_string_free(gstr, TRUE);
-          created = 1;
 #elif NCURSES
           if (getCDKScrollItems(scrolled, NULL) > 0) {
             i = getCDKScrollCurrentItem(scrolled);
@@ -1043,25 +1057,14 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
             if (string_output) {
               if (i * ncols + output_col - 1 < len)
                 txt = (char *)items[i * ncols + output_col - 1];
-              else
-                txt = "";
-            } else {
-              txt = malloc(4);
-              sprintf(txt, "%i", i);
-              created = 1;
-            }
-          } else {
-            txt = "";
+            } else txt = malloc(4), sprintf(txt, "%i", i), created = TRUE;
           }
-          destroyCDKEntry(entry);
-          destroyCDKScroll(scrolled);
+          destroyCDKEntry(entry), destroyCDKScroll(scrolled);
           if (model.rows) {
-            for (i = -1; i < model.num_rows; i++)
-              free(model.rows[i]);
+            for (i = -1; i < model.num_rows; i++) free(model.rows[i]);
             free(&model.rows[-1]);
           }
-          if (model.filtered_rows)
-            free(model.filtered_rows);
+          if (model.filtered_rows) free(model.filtered_rows);
 #endif
         }
         char *new_out = malloc(strlen(out) + strlen(txt) + 2);
@@ -1074,34 +1077,19 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   } else if (type == GTDIALOG_FILESELECT || type ==  GTDIALOG_FILESAVE) {
 #if GTK
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+      GtkFileChooser *chooser = GTK_FILE_CHOOSER(dialog);
       if (type == GTDIALOG_FILESELECT &&
-          gtk_file_chooser_get_select_multiple(GTK_FILE_CHOOSER(dialog))) {
-        out = malloc(1);
-        *out = '\0';
-        GSList *filenames =
-          gtk_file_chooser_get_filenames(GTK_FILE_CHOOSER(dialog));
-        GSList *item = filenames;
-        while (item) {
-          char *data = (char *)item->data;
-          char *new_out = malloc(strlen(out) + strlen(data) + 2);
-          sprintf(new_out, "%s\n%s", out, data);
+          gtk_file_chooser_get_select_multiple(chooser)) {
+        out = copy("");
+        GSList *filenames = gtk_file_chooser_get_filenames(chooser), *i = NULL;
+        for (i = filenames; i; i = i->next) {
+          char *new_out = g_strconcat(out, "\n", (char *)i->data, NULL);
           free(out);
-          g_free(item->data);
-          item = item->next;
           out = new_out;
         }
-        g_slist_free(filenames);
-      } else {
-        char *text = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-        int len = strlen(text);
-        out = malloc(len + 1);
-        strncpy(out, text, len);
-        out[len] = '\0';
-      }
-    } else {
-      out = malloc(1);
-      *out = '\0';
-    }
+        g_slist_free_full(filenames, g_free);
+      } else out = copy(gtk_file_chooser_get_filename(chooser));
+    } else out = copy("");
 #elif NCURSES
     const char *charset = getenv("CHARSET");
     if (!charset || !*charset) {
@@ -1109,46 +1097,48 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       if (!locale || !*locale) locale = getenv("LANG");
       if (locale && (charset = strchr(locale, '.'))) charset++;
     }
-    char *text = activateCDKFselect(fileselect, NULL);
-    if (text) {
-      size_t text_len = strlen(text);
+    char *txt = activateCDKFselect(fileselect, NULL);
+    if (txt) {
+      size_t text_len = strlen(txt);
       char *iconv_out = malloc(text_len + 1);
       if (!no_utf8) {
         // Convert to UTF-8.
         iconv_t cd = iconv_open("UTF-8", charset);
         if (cd != (iconv_t)-1) {
-          char *inp = text, *outp = iconv_out;
+          char *inp = txt, *outp = iconv_out;
           size_t inbytesleft = text_len, outbytesleft = text_len;
           if (iconv(cd, &inp, &inbytesleft, &outp, &outbytesleft) != -1)
-            text = iconv_out, text[outp - iconv_out] = '\0';
+            txt = iconv_out, txt[outp - iconv_out] = '\0';
           iconv_close(cd);
         }
       }
-      int len = strlen(text);
-      out = malloc(len + 1);
-      strncpy(out, text, len);
-      out[len] = '\0';
+      out = copy(txt);
       free(iconv_out);
-    } else {
-      out = malloc(1);
-      *out = '\0';
-    }
+    } else out = copy("");
     destroyCDKFselect(fileselect);
     chdir(cwd);
 #endif
   } else if (type == GTDIALOG_PROGRESSBAR) {
 #if GTK
     gtk_widget_show_all(GTK_WIDGET(dialog));
-    // TODO: read from stdin and update progressbar
+#if !_WIN32
+    GIOChannel *ch = g_io_channel_unix_new(0);
+#else
+    GIOChannel *ch = g_io_channel_win32_new_fd(stdin);
+#endif
+    g_io_channel_set_encoding(ch, NULL, NULL);
+    int source = g_io_add_watch(ch, G_IO_IN | G_IO_HUP, read_stdin, dialog);
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) != 1)
+      out = copy("");
+    else
+      out = copy("stopped");
+    g_source_remove(source), g_io_channel_unref(ch), g_io_channel_unref(ch);
 #endif
   }
-  if (strcmp(out, "0") == 0 && string_output) {
-    out = malloc(8);
-    sprintf(out, "timeout");
-  } else if (strcmp(out, "-1") == 0 && string_output) {
-    out = malloc(7);
-    sprintf(out, "delete");
-  }
+  if (strcmp(out, "0") == 0 && string_output)
+    out = copy("timeout");
+  else if (strcmp(out, "-1") == 0 && string_output)
+    out = copy("delete");
 #if GTK
   gtk_widget_destroy(dialog);
 #elif NCURSES
@@ -1166,606 +1156,428 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   return out;
 }
 
-int error(int argc, char *argv[]) {
+// Help on dialog types.
+#define HELP_MSGBOX \
+"gtdialog msgbox [args]\n" \
+"  A generic message box with custom button labels.\n" \
+"gtdialog ok-msgbox [args]\n" \
+"  Identical to msgbox, but with localized “Ok” and “Cancel” buttons.\n" \
+"gtdialog yesno-msgbox [args]\n" \
+"  Identical to msgbox, but with localized “Yes”, “No”, and “Cancel” buttons.\n"
+#define HELP_INPUTBOX \
+"gtdialog inputbox [args]\n" \
+"  A one line input box with custom button labels.\n" \
+"gtdialog standard-inputbox [args]\n" \
+"  Identical to inputbox, but with localized “Ok” and “Cancel” buttons.\n" \
+"gtdialog secure-inputbox [args]\n" \
+"  Identical to inputbox, but input is masked.\n" \
+"gtdialog secure-standard-inputbox [args]\n" \
+"  Identical to standard-inputbox, but input is masked.\n"
+#define HELP_FILE \
+"gtdialog fileselect [args]\n" \
+"  A file selection dialog for opening files.\n" \
+"gtdialog filesave [args]\n" \
+"  A file selection dialog for saving a file.\n"
+#define HELP_TEXTBOX \
+"gtdialog textbox [args]\n" \
+"  A multiple line text box with custom button labels.\n"
+#define HELP_PROGRESSBAR \
+"gtdialog progressbar [args]\n" \
+"  A progressbar dialog with updates from stdin.\n"
+#define HELP_DROPDOWN \
+"gtdialog dropdown [args]\n" \
+"  A drop down list of items to select from with custom button labels.\n" \
+"gtdialog standard-dropdown [args]\n" \
+"  Identical to drop down, but with localized “Ok” and “Cancel” buttons.\n"
+#define HELP_FILTEREDLIST \
+"gtdialog filteredlist [args]\n" \
+"  A list of items to filter through and select from with custom button\n" \
+"  labels.\n" \
+"  Spaces in the filter text are treated as wildcards.\n"
+#define HELP_ALL \
+"Usage: gtdialog type [args]\n" \
+"\n" \
+HELP_MSGBOX HELP_INPUTBOX HELP_FILE HELP_TEXTBOX HELP_PROGRESSBAR \
+HELP_DROPDOWN HELP_FILTEREDLIST \
+"\n" \
+"gtdialog help type\n" \
+"   Shows detailed documentation on gtdialog type\n"
+
+// Help on dialog arguments.
+#define HELP_DEFAULT_ARGS \
+"  --title str\n" \
+"      The dialog's title text.\n" \
+"  --string-output\n" \
+"      Output the names of selected buttons/items or exit codes instead of\n" \
+"      button/item indexes or exit code numbers.\n" \
+"  --no-newline\n" \
+"      Do not output the default trailing newline.\n" \
+"  --width int\n" \
+"      Manually set the width of the dialog in pixels if possible.\n" \
+"  --height int\n" \
+"      Manually set the height of the dialog in pixels if possible.\n"
+#define HELP_TEXT_MAIN \
+"  --text str\n" \
+"      The main message text.\n"
+#define HELP_INFORMATIVE_TEXT_EXTRA \
+"  --informative-text str\n" \
+"      Extra informative text.\n"
+#define HELP_BUTTON1_MSGBOX \
+"  --button1 str\n" \
+"      The right-most button's label. The default is “Ok” for ok-msgbox and\n" \
+"      “Yes” for yesno-msgbox.\n"
+#define HELP_BUTTON2_MSGBOX \
+"  --button2 str\n" \
+"      The middle button's label. The default is “Cancel” for ok-msgbox and\n" \
+"      “No” for yesno-msgbox.\n"
+#define HELP_BUTTON3_MSGBOX \
+"  --button3 str\n" \
+"      The left-most button's label. The default is “Cancel” for\n" \
+"      yesno-msgbox.\n" \
+"      Requires --button2.\n"
+#define HELP_NO_CANCEL_MSGBOX \
+"  --no-cancel\n" \
+"      Only show “Ok” button for ok-msgbox and yesno-msgbox.\n"
+#define HELP_FLOAT \
+"  --float\n" \
+"      Show the dialog on top of all windows.\n"
+#define HELP_TIMEOUT \
+"  --timeout int\n" \
+"      The number of seconds the dialog waits for a button click before\n" \
+"      timing out. Dialogs do not time out by default.\n"
+#define HELP_INFORMATIVE_TEXT_MAIN \
+"  --informative-text str\n" \
+"      The main message text.\n"
+#define HELP_TEXT_INPUT \
+"  --text str\n" \
+"      The initial input text.\n"
+#define HELP_NO_SHOW \
+"  --no-show\n" \
+"      Mask the user input by showing typed characters as password\n" \
+"      characters.\n"
+#define HELP_BUTTON1_INPUTBOX \
+"  --button1 str\n" \
+"      The right-most button's label. The default is “Ok” for\n" \
+"      standard-inputbox.\n"
+#define HELP_BUTTON2_INPUTBOX \
+"  --button2 str\n" \
+"      The middle button's label. The default is “Cancel” for\n" \
+"      standard-inputbox.\n"
+#define HELP_BUTTON3_INPUTBOX \
+"  --button3 str\n" \
+"      The left-most button's label.\n" \
+"      Requires --button2.\n"
+#define HELP_NO_CANCEL_INPUTBOX \
+"  --no-cancel\n" \
+"      Only show “Ok” button for standard-inputbox.\n"
+#define HELP_WITH_DIRECTORY \
+"  --with-directory str\n" \
+"      The initial directory. The system determines the default directory.\n"
+#define HELP_WITH_FILE \
+"  --with-file str\n" \
+"      The initially selected filename. The first filename in the list is\n" \
+"      selected by default.\n" \
+"      Requires --with-directory.\n"
+#define HELP_WITH_EXTENSION \
+"  --with-extension list\n" \
+"      The set of extensions to limit selectable files to. Each extension\n" \
+"      must be a separate argument with the ‘.’ being optional.\n"
+#define HELP_SELECT_MULTIPLE_FILESELECT \
+"  --select-multiple\n" \
+"      Enable multiple file selection in fileselect.\n"
+#define HELP_SELECT_ONLY_DIRECTORIES \
+"  --select-only-directories\n" \
+"      Prompt for directory selection in fileselect.\n"
+#define HELP_NO_CREATE_DIRECTORIES \
+"  --no-create-directories\n" \
+"      Prevent the user from creating new directories in filesave.\n"
+#define HELP_NO_UTF8 \
+"  --no-utf8\n" \
+"      Do not automatically convert filenames to UTF-8.\n" \
+"      Only applicable in ncurses.\n"
+#define HELP_INFORMATIVE_TEXT_TEXTBOX \
+"  --informative-text str\n" \
+"      Informative message text.\n"
+#define HELP_TEXT_TEXTBOX \
+"  --text str\n" \
+"      The initial text in the textbox.\n"
+#define HELP_TEXT_FROM_FILE \
+"  --text-from-file str\n" \
+"      The filename whose contents are loaded into the textbox.\n" \
+"      Has no effect when --text is present.\n"
+#define HELP_BUTTON1 \
+"  --button1 str\n" \
+"      The right-most button's label.\n"
+#define HELP_BUTTON2 \
+"  --button2 str\n" \
+"      The middle button's label.\n"
+#define HELP_BUTTON3 \
+"  --button3 str\n" \
+"      The left-most button's label.\n" \
+"      Requires --button2.\n"
+#define HELP_EDITABLE \
+"  --editable\n" \
+"      Allow textbox editing.\n"
+#define HELP_FOCUS_TEXTBOX \
+"  --focus-textbox\n" \
+"      Focus on the textbox instead of the dialog buttons.\n"
+#define HELP_SCROLL_TO \
+"  --scroll-to bottom|top\n" \
+"      Scroll to the “bottom” or “top” of the textbox when not all text is\n" \
+"      visible. The default is “top”.\n"
+#define HELP_SELECTED \
+"  --selected\n" \
+"      Select all textbox text.\n"
+#define HELP_MONOSPACED_FONT \
+"  --monospaced-font\n" \
+"      Use a monospaced font instead of a proportional one.\n"
+#define HELP_PERCENT \
+"  --percent int\n" \
+"      The initial progressbar percentage between 0 and 100.\n"
+#define HELP_TEXT_PROGRESSBAR \
+"  --text str\n" \
+"      The initial progressbar display text.\n"
+#define HELP_INDETERMINATE \
+"  --indeterminate\n" \
+"      Show the progressbar as “busy” with no percentage updates.\n"
+#define HELP_STOPPABLE \
+"  --stoppable\n" \
+"      Show the Stop button.\n"
+#define HELP_ITEMS_DROPDOWN \
+"  --items list\n" \
+"      The list of items to show in the drop down. Each item must be a\n" \
+"      separate argument.\n"
+#define HELP_NO_CANCEL_DROPDOWN \
+"  --no-cancel\n" \
+"      Only show “Ok” button for standard-dropdown.\n"
+#define HELP_EXIT_ONCHANGE \
+"  --exit-onchange\n" \
+"      Selecting a new item closes the dialog.\n"
+#define HELP_SELECT \
+"  --select int\n" \
+"      The zero-based index of the item in the list to select. The first\n" \
+"      item in the list is selected by default.\n"
+#define HELP_COLUMNS \
+"  --columns list\n" \
+"      The column names for a list row. Each name must be a separate\n" \
+"      argument.\n"
+#define HELP_ITEMS_FILTEREDLIST \
+"  --items list\n" \
+"      The items to show in the list. Each item must be a separate argument\n" \
+"      and is inserted into the first empty column in the current list row.\n" \
+"      Requires --columns.\n"
+#define HELP_SELECT_MULTIPLE_FILTEREDLIST \
+"  --select-multiple\n" \
+"      Enable multiple item selection.\n"
+#define HELP_SEARCH_COLUMN \
+"  --search-column int\n" \
+"      The column number to filter the input text against. The default is\n" \
+"      0.\n" \
+"      Requires --columns.\n"
+#define HELP_OUTPUT_COLUMN \
+"  --output-column int\n" \
+"      The column number to use for --string-output. The default is 0.\n"
+
+// Help on dialog returns.
+#define HELP_MSGBOX_RETURN \
+"The message box dialogs return a string containing the number of the\n" \
+"button pressed, ‘0’ if the dialog timed out, or “-1” if the user canceled\n" \
+"the dialog. If --string-output was given, the return string contains the\n" \
+"label of the button pressed, “timeout” if the dialog timed out, or\n" \
+"“delete” if the user canceled the dialog.\n"
+#define HELP_INPUTBOX_RETURN \
+"The input dialogs return a string containing the number of the button\n" \
+"pressed followed by a newline character (‘\\n’) and the input text, ‘0’ if\n" \
+"the dialog timed out, or “-1” if the user canceled the dialog. If\n" \
+"--string-output was given, the return string contains the label of the\n" \
+"button pressed followed by a newline and the input text, “timeout” if the\n" \
+"dialog timed out, or “delete” if the user canceled the dialog.\n"
+#define HELP_FILE_RETURN \
+"The file dialogs return a string containing the file(s) selected or the\n" \
+"empty string if the user canceled the dialog.\n"
+#define HELP_TEXTBOX_RETURN \
+"The textbox dialog returns a string containing the number of the button\n" \
+"pressed and, if --editable was given, a newline character (‘\\n’) followed\n" \
+"by the textbox text; otherwise ‘0’ if the dialog timed out or “-1” if the\n" \
+"user canceled the dialog. If --string-output was given, the return string\n" \
+"contains the label of the button pressed and, if --editable was given, a\n" \
+"newline followed by the textbox text; otherwise “timeout” if the dialog\n" \
+"timed out or “delete” if the user canceled the dialog.\n"
+#define HELP_PROGRESSBAR_RETURN \
+"The progressbar dialog reads lines from standard input (stdin) and updates\n" \
+"the progressbar until the dialog receives an EOF. Input lines are of the\n" \
+"form “num str\\n” where “num” is a progress percentage between 0 and 100\n" \
+"and “str” is optional progress display text. The newline character (‘\\n’)\n" \
+"is required. If “str” is empty, the current progress display text is\n" \
+"retained. If --stoppable is given and “str” is either “stop disable” or\n" \
+"“stop enable”, the Stop button is disabled or enabled, respectively.\n" \
+"The dialog returns the string “stopped” only if --stopped was given and\n" \
+"the Stop button was pressed. Otherwise it returns nothing.\n"
+#define HELP_DROPDOWN_RETURN \
+"The dropdown dialogs return a string containing the number of the button\n" \
+"pressed (or ‘4’ if --exit-onchange was responsible) followed by a newline\n" \
+"character (‘\\n’) and the index of the selected item starting from 0, ‘0’\n" \
+"if the dialog timed out, or “-1” if the user canceled the dialog. If\n" \
+"--string-output was given, the return string contains the label of the\n" \
+"button pressed (or ‘4’, yes ‘4’, if --exit-onchange was responsible)\n" \
+"followed by a newline and the selected item, “timeout” if the dialog timed\n" \
+"out, or “delete” if the user canceled the dialog.\n"
+#define HELP_FILTEREDLIST_RETURN \
+"The filteredlist dialog returns a string containing the number of the\n" \
+"button pressed followed by a newline character (‘\\n’) and the index of\n" \
+"the selected item(s) starting from 0, ‘0’ if the dialog timed out, or “-1”\n" \
+"if the user canceled the dialog. If --string-output was given, the return\n" \
+"string contains the label of the button pressed followed by a newline and\n" \
+"the selected item(s) (based on --output-column, if applicable), “timeout”\n" \
+"if the dialog timed out, or “delete” if the user canceled the dialog.\n"
+
+// Help with dialog examples.
+#define HELP_MSGBOX_EXAMPLE \
+"  gtdialog msgbox --title 'EOL Mode' --text 'Which EOL?' \\\n" \
+"    --button1 CRLF --button2 CR --button3 LF\n"
+#define HELP_INPUTBOX_EXAMPLE \
+"  gtdialog standard-inputbox --title 'Goto Line' \\\n" \
+"    --informative-text 'Line:' --text 1 --no-newline\n"
+#define HELP_FILE_EXAMPLE \
+"  gtdialog fileselect --title 'Open C File' --with-directory $HOME \\\n" \
+"    --with-extension c h --select-multiple --no-newline\n"
+#define HELP_TEXTBOX_EXAMPLE \
+"  gtdialog textbox --title 'License Agreement' \\\n" \
+"    --informative-text 'You agree to:' --text-from-file LICENSE --button1 Ok\n"
+#define HELP_PROGRESSBAR_EXAMPLE \
+"  for i in 25 50 75 100; do echo $i $i% done; sleep 1; done | \\\n" \
+"    gtdialog progressbar --title 'Status' --width 200 --stoppable\n"
+#define HELP_DROPDOWN_EXAMPLE \
+"  gtdialog dropdown --title 'Select Encoding' \\\n" \
+"    --items UTF-8 ASCII ISO-8859-1 MacRoman --no-cancel --string-output \\\n" \
+"    --no-newline\n"
+#define HELP_FILTEREDLIST_EXAMPLE \
+"  gtdialog filteredlist --title Title --columns Foo Bar \\\\n" \
+"    --items a b c d --no-newline\n"
+
+// Help template.
+#define HELP(type, args, returns, example) \
+type "\nArguments:\n" HELP_DEFAULT_ARGS args "\n" returns "\nExample:\n" example
+
+/**
+ * Prints help for the gtdialog to the command line.
+ * @param argc The number of command line parameters.
+ * @param argv The set of command line parameters for the dialog.
+ */
+int help(int argc, char *argv[]) {
 #ifndef NOHELP
-  int type = -1;
-  if (argc == 3)
-    type = gtdialog_type(argv[2]);
-  const char *msg = 0;
-  switch (type) {
+  switch ((argc == 3) ? gtdialog_type(argv[2]) : -1) {
   case GTDIALOG_MSGBOX:
-    msg =
-      "gtdialog msgbox [options]\n"
-      "\n"
-      "This control provides a generic message box. It allows you to customize the\n"
-      "labels of the buttons. At least one button (--button1) must be specified. If\n"
-      "labels for the other buttons are not given, the buttons will not appear on the\n"
-      "message box\n"
-      "\n"
-      "Buttons go from right to left. --button1 is the right-most button.\n"
-      "\n"
-      "Also see the yesno-msgbox and ok-msgbox.\n"
-      "\n"
-      "Options: (in addition to global options)\n"
-      "  --text\n"
-      "      This is the main, bold message text.\n"
-      "  --informative-text\n"
-      "      This is the extra, smaller message text.\n"
-      "  --icon\n"
-      "      The name of the stock icon to use. This is incompatible with --icon-file.\n"
-      "      Default is no icon.\n"
-      "  --icon-file\n"
-      "      The full path to the custom icon image you would like to use. Almost\n"
-      "      every image format is accepted. This is incompatible with the --icon\n"
-      "      option.\n"
-      "  --float\n"
-      "      Float on top of all windows.\n"
-      "  --timeout\n"
-      "      The amount of time, in seconds, that the window will be displayed if the\n"
-      "      user does not click a button. Does not time out by default.\n"
-      "  --button1\n"
-      "      required. This is the right-most button.\n"
-      "  --button2\n"
-      "      This is the middle button.\n"
-      "  --button3\n"
-      "      This is the left-most button. This will not be displayed if there is no\n"
-      "      --button2 label specified.\n"
-      "\n"
-      "Example:\n"
-      "  gtdialog msgbox --no-newline \\\n"
-      "    --text \"What's your favorite OS?\" \\\n"
-      "    --informative-text \"The 'Cancel' label auto-binds that button to esc\" \\\n"
-      "    --button1 \"OS X\" --button2 \"GNU/LINUX\" --button3 \"Cancel\"\n";
-    break;
   case GTDIALOG_OK_MSGBOX:
-    msg =
-      "gtdialog ok-msgbox [options]\n"
-      "\n"
-      "This control provides a standard Ok/Cancel message box.\n"
-      "\n"
-      "returns: 1 for ok, 2 for cancel depending on which button was pressed; gtk-ok\n"
-      "or gtk-cancel if the --string-output option is given. If the dialog times out,\n"
-      "it will return 0 or timeout.\n"
-      "\n"
-      "Options: (in addition to global options)\n"
-      "  --text \"main text message\"\n"
-      "      This is the main, bold message text.\n"
-      "  --informative-text \"extra informative text to be displayed\"\n"
-      "      This is the extra, smaller text.\n"
-      "  --no-cancel\n"
-      "      Don't show a cancel button, only \"Ok\".\n"
-      "  --icon stockIconName\n"
-      "      The name of the stock icon to use. This is incompatible with --icon-file\n"
-      "      Default is no icon.\n"
-      "  --icon-file \"/full/path/to/icon file\"\n"
-      "      The full path to the custom icon image you would like to use. Almost\n"
-      "      every image format is accepted. This is incompatible with the --icon\n"
-      "      option.\n"
-      "  --float\n"
-      "      Float on top of all windows.\n"
-      "  --timeout numSeconds\n"
-      "      The amount of time, in seconds, that the window will be displayed if the\n"
-      "      user does not click a button. Does not time out by default.\n"
-      "\n"
-      "Example:\n"
-      "  gtdialog ok-msgbox --text \"We need to make sure you see this message\" \\\n"
-      "    --informative-text \"(Yes, the message was to inform you about itself)\" \\\n"
-      "    --no-newline --float\n";
-    break;
   case GTDIALOG_YESNO_MSGBOX:
-    msg =
-      "gtdialog yesno-msgbox [options]\n"
-      "\n"
-      "This control provides a standard Yes/No/Cancel message box.\n"
-      "\n"
-      "returns: 1 for yes, 2 for no, 3 for cancel depending on which button was\n"
-      "pressed; gtk-yes, gtk-no, or gtk-cancel if the --string-output option is\n"
-      "given. If the dialog times out, it will return 0 or timeout.\n"
-      "\n"
-      "Options: (in addition to global options)\n"
-      "  --text \"main text message\"\n"
-      "      This is the main, bold message text.\n"
-      "  --informative-text \"extra informative text to be displayed\"\n"
-      "      This is the extra, smaller text.\n"
-      "  --no-cancel\n"
-      "      Don't show a cancel button, only \"Ok\".\n"
-      "  --icon stockIconName\n"
-      "      The name of the stock icon to use. This is incompatible with --icon-file\n"
-      "      Default is no icon.\n"
-      "  --icon-file \"/full/path/to/icon file\"\n"
-      "      The full path to the custom icon image you would like to use. Almost\n"
-      "      every image format is accepted. This is incompatible with the --icon\n"
-      "      option.\n"
-      "  --float\n"
-      "      Float on top of all windows.\n"
-      "  --timeout numSeconds\n"
-      "      The amount of time, in seconds, that the window will be displayed if the\n"
-      "      user does not click a button. Does not time out by default.\n"
-      "\n"
-      "Example:\n"
-      "  gtdialog yesno-msgbox --no-cancel --string-output --no-newline \\\n"
-      "    --text \"This is a simple first example\" \\\n"
-      "    --informative-text \"We're just going to echo the string output\"\n";
+    puts(HELP(HELP_MSGBOX,
+              HELP_TEXT_MAIN
+              HELP_INFORMATIVE_TEXT_EXTRA
+              HELP_BUTTON1_MSGBOX
+              HELP_BUTTON2_MSGBOX
+              HELP_BUTTON3_MSGBOX
+              HELP_NO_CANCEL_MSGBOX
+              HELP_FLOAT HELP_TIMEOUT,
+              HELP_MSGBOX_RETURN, HELP_MSGBOX_EXAMPLE));
     break;
   case GTDIALOG_INPUTBOX:
-    msg =
-      "gtdialog inputbox [options]\n"
-      "\n"
-      "This control provides a one line input box and customizable buttons. At least\n"
-      "one button (--button1) must be specified. If labels for the other buttons are\n"
-      "not given, the buttons will not appear on the message box.\n"
-      "\n"
-      "Buttons go from right to left. --button1 is the right-most button.\n"
-      "\n"
-      "returns: 1, 2, or 3 depending on which button was pressed; or the label of the\n"
-      "button if the --string-output option is given. On the next line will be the\n"
-      "text provided by the user in the textbox. On a timeout, it will return 0 or\n"
-      "timeout, and the text from the textbox will not be returned.\n"
-      "\n"
-      "Also see the standard-inputbox.\n"
-      "\n"
-      "Options: (in addition to global options)\n"
-      "  --text \"main text message\"\n"
-      "      This is the main, bold message text.\n"
-      "  --informative-text \"extra informative text to be displayed\"\n"
-      "      This is the extra, smaller text.\n"
-      "  --button1\n"
-      "      required. This is the right-most button.\n"
-      "  --button2\n"
-      "      This is the middle button.\n"
-      "  --button3\n"
-      "      This is the left-most button. This will not be displayed if there is no\n"
-      "      --button2 label specified.\n"
-      "  --float\n"
-      "      Float on top of all windows.\n"
-      "  --timeout numSeconds\n"
-      "      The amount of time, in seconds, that the window will be displayed if the\n"
-      "      user does not click a button. Does not time out by default.\n"
-      "  --no-show\n"
-      "      This makes it a secure inputbox. Instead of what the user types, only\n"
-      "      dots will be shown.\n"
-      "\n"
-      "Example:\n"
-      "  gtdialog inputbox --title \"Search\" --no-newline \\\n"
-      "    --informative-text \"Enter your search term\" \\\n"
-      "    --text \"foobar\" \\\n"
-      "    --button1 \"Search\" --button2 \"Search all\" \\\n"
-      "    --width 600\n";
-    break;
   case GTDIALOG_STANDARD_INPUTBOX:
-    msg =
-      "gtdialog standard-inputbox [options]\n"
-      "\n"
-      "This control provides a standard input box with \"Ok\" and \"Cancel\" buttons.\n"
-      "\n"
-      "returns: 1 for ok, 2 for cancel depending on which button was pressed; gtk-ok,\n"
-      "or gtk-cancel if the --string-output option is given. On the next line will be\n"
-      "the text provided by the user in the textbox. On a timeout, it will return 0 or\n"
-      "timeout, and the text from the textbox will not be returned.\n"
-      "\n"
-      "Also see the standard-inputbox.\n"
-      "\n"
-      "Options: (in addition to global options)\n"
-      "  --text \"main text message\"\n"
-      "      This is the main, bold message text.\n"
-      "  --informative-text \"extra informative text to be displayed\"\n"
-      "      This is the extra, smaller text.\n"
-      "  --no-cancel\n"
-      "      Don't show a cancel button, only \"Ok\".\n"
-      "  --float\n"
-      "      Float on top of all windows.\n"
-      "  --timeout numSeconds\n"
-      "      The amount of time, in seconds, that the window will be displayed if the\n"
-      "      user does not click a button. Does not time out by default.\n"
-      "  --no-show\n"
-      "      This makes it a secure inputbox. Instead of what the user types, only\n"
-      "      dots will be shown.\n"
-      "\n"
-      "Example:\n"
-      "  gtdialog standard-inputbox --title \"Your Name\" --no-newline \\\n"
-      "    --informative \"Enter your name\"\n";
-    break;
   case GTDIALOG_SECURE_INPUTBOX:
-    msg =
-      "gtdialog secure-inputbox [options]\n"
-      "\n"
-      "This is an alias for running an inputbox with the --no-show option. All\n"
-      "options available to inputbox are available to secure-inputbox.\n";
-    break;
   case GTDIALOG_SECURE_STANDARD_INPUTBOX:
-    msg =
-      "gtdialog secure-standard-inputbox [options]\n"
-      "\n"
-      "This is an alias for running a standard-inputbox with the --no-show option. All\n"
-      "options available to standard-inputbox are available to secure-standard-inputbox.\n";
+    puts(HELP(HELP_INPUTBOX,
+              HELP_INFORMATIVE_TEXT_MAIN
+              HELP_TEXT_INPUT
+              HELP_NO_SHOW
+              HELP_BUTTON1_INPUTBOX
+              HELP_BUTTON2_INPUTBOX
+              HELP_BUTTON3_INPUTBOX
+              HELP_NO_CANCEL_INPUTBOX
+              HELP_FLOAT HELP_TIMEOUT,
+              HELP_INPUTBOX_RETURN, HELP_INPUTBOX_EXAMPLE));
     break;
   case GTDIALOG_FILESELECT:
-    msg =
-      "gtdialog fileselect [options]\n"
-      "\n"
-      "This control provides a file selection window.\n"
-      "\n"
-      "returns: the files or directories selected by the user, or nothing if they\n"
-      "cancel.\n"
-      "\n"
-      "Options: (in addition to global options)\n"
-      "  --text \"main text message\"\n"
-      "      This is the main, bold message text.\n"
-      "  --select-directories\n"
-      "      Allow the user to select directories as well as files. Default is to\n"
-      "      disallow it.\n"
-      "  --select-only-directories\n"
-      "      Allows the user to select only directories.\n"
-      "  --packages-as-directories\n"
-      "      Allows the user to navigate into packages as if they were directories,\n"
-      "      rather than selecting the package as a file.\n"
-      "  --select-multiple\n"
-      "      Allow the user to select more than one file. Default is to allow only one\n"
-      "      file/directory selection.\n"
-      "  --with-extensions list of extensions\n"
-      "      Limit selectable files to ones with these extensions. list of extensions\n"
-      "      should be space separated, and given as multiple arguments (ie: don't\n"
-      "      double quote the list).\n"
-      "      Example: gtdialog fileselect --with-extensions .c .h .m .txt\n"
-      "      The period/dot at the start of each extension is optional.\n"
-      "  --with-directory directory\n"
-      "      Start the file select window in directory. The default value is up to the\n"
-      "      system, and will usually be the last directory visited in a file select\n"
-      "      dialog.\n"
-      "  --with-file file\n"
-      "      Start the file select window with file already selected. By default no\n"
-      "      file will be selected. This must be used with --with-directory. It should\n"
-      "      be the filename of a file within the directory.\n"
-      "  --no-utf8\n"
-      "      Do not convert filenames to UTF-8. By default filenames are converted\n"
-      "      to UTF-8. This option has no effect on GTK."
-      "\n"
-      "Example:\n"
-      "  gtdialog fileselect \\\n"
-      "    --title \"This is a fileselect\" \\\n"
-      "    --text \"Choose the source file for the main controller\" \\\n"
-      "    --with-extensions .c .m .cpp\n";
-    break;
   case GTDIALOG_FILESAVE:
-    msg =
-      "gtdialog filesave [options]\n"
-      "\n"
-      "This control provides a file save window, which allows the user to select a\n"
-      "file, or specify a new file.\n"
-      "\n"
-      "This dialog allows the user to create directories. However, if the user\n"
-      "specifies a file that does not yet exist, it will not be created. This is a\n"
-      "task for your script.\n"
-      "\n"
-      "returns: the file selected (which may not exist), or nothing if they cancel.\n"
-      "\n"
-      "Options: (in addition to global options)\n"
-      "  --text \"main text message\"\n"
-      "      This is the main, bold message text.\n"
-      "  --packages-as-directories\n"
-      "      Allows the user to navigate into packages as if they were directories,\n"
-      "      rather than selecting the package as a file.\n"
-      "  --no-create-directories\n"
-      "      Prevents the user from creating new directories.\n"
-      "  --with-extensions list of extensions\n"
-      "      Limit selectable files to ones with these extensions. list of extensions\n"
-      "      should be space separated, and given as multiple arguments (ie: don't\n"
-      "      double quote the list).\n"
-      "      Example: gtdialog filesave --with-extensions .c .h .m .txt\n"
-      "      The period/dot at the start of each extension is optional.\n"
-      "  --with-directory directory\n"
-      "      Start the file select window in directory. The default value is up to the\n"
-      "      system, and will usually be the last directory visited in a file select\n"
-      "      dialog.\n"
-      "  --with-file file\n"
-      "      Start the file select window with file already selected. By default no\n"
-      "      file will be selected. This must be used with --with-directory. It should\n"
-      "      be the filename of a file within the directory.\n";
-      "  --no-utf8\n"
-      "      Do not convert filenames to UTF-8. By default filenames are converted\n"
-      "      to UTF-8. This option has no effect on GTK.";
+    puts(HELP(HELP_FILE,
+              HELP_WITH_DIRECTORY
+              HELP_WITH_FILE
+              HELP_WITH_EXTENSION
+              HELP_SELECT_MULTIPLE_FILESELECT
+              HELP_SELECT_ONLY_DIRECTORIES
+              HELP_NO_CREATE_DIRECTORIES
+              HELP_NO_UTF8,
+              HELP_FILE_RETURN, HELP_FILE_EXAMPLE));
     break;
   case GTDIALOG_TEXTBOX:
-    msg =
-      "gtdialog textbox [options]\n"
-      "\n"
-      "This is a text box with a large text area.\n"
-      "\n"
-      "At least one button (--button1) must be specified. If labels for the other\n"
-      "buttons are not given, the buttons will not appear on the text box.\n"
-      "\n"
-      "Buttons go from right to left. --button1 is the right-most button.\n"
-      "\n"
-      "returns: 1, 2, or 3 depending on which button was pressed; or the label of the\n"
-      "button if the --string-output option is given. If the --editable option was\n"
-      "given, it will print the contents of the text box following the return value\n"
-      "for the button. On a timeout, it will return 0 or timeout, and the text from\n"
-      "the textbox will not be returned.\n"
-      "\n"
-      "Options: (in addition to global options)\n"
-      "  --text \"main text message\"\n"
-      "      This is the main, bold message text.\n"
-      "  --text-from-file filename\n"
-      "      This is the message above the text box.\n"
-      "  --informative-text \"extra informative text to be displayed\"\n"
-      "      This is the extra, smaller text.\n"
-      "  --button1\n"
-      "      required. This is the right-most button.\n"
-      "  --button2\n"
-      "      This is the middle button.\n"
-      "  --button3\n"
-      "      This is the left-most button. This will not be displayed if there is no\n"
-      "      --button2 label specified.\n"
-      "  --editable\n"
-      "      Makes the text box editable. When this option is set, the return value\n"
-      "      for the button will be followed with the contents of the text box.\n"
-      "  --focus-textbox\n"
-      "      This option is only useful when --editable is set. This makes the initial\n"
-      "      focus on the textbox rather than the rightmost button.\n"
-      "  --selected\n"
-      "      Selects all the text in the text box.\n"
-      "  --scroll-to bottom_or_top\n"
-      "      Where bottom_or_top is one of bottom or top. Causes the text box to\n"
-      "      initially scroll to the bottom or top if the text it contains is larger\n"
-      "      than its current view. Default is top.\n"
-      "  --float\n"
-      "      Float on top of all windows.\n"
-      "  --timeout numSeconds\n"
-      "      The amount of time, in seconds, that the window will be displayed if the\n"
-      "      user does not click a button. Does not time out by default.\n"
-      "  --monospaced-font\n"
-      "      A monospaced font is used in the text box instead of a proportional one."
-      "\n"
-      "Example:\n"
-      "  gtdialog textbox --title \"License\" --no-newline \\\n"
-      "    --informative-text \"Do you agree with the terms of this license?\" \\\n"
-      "    --text-from-file COPYING --button1 gtk-ok --button2 gtk-cancel\n";
+    puts(HELP(HELP_TEXTBOX,
+              HELP_INFORMATIVE_TEXT_TEXTBOX
+              HELP_TEXT_TEXTBOX
+              HELP_TEXT_FROM_FILE
+              HELP_BUTTON1
+              HELP_BUTTON2
+              HELP_BUTTON3
+              HELP_EDITABLE
+              HELP_FOCUS_TEXTBOX
+              HELP_SCROLL_TO
+              HELP_SELECTED
+              HELP_MONOSPACED_FONT
+              HELP_FLOAT HELP_TIMEOUT,
+              HELP_TEXTBOX_RETURN, HELP_TEXTBOX_EXAMPLE));
     break;
   case GTDIALOG_PROGRESSBAR:
-    msg =
-      "gtdialog progressbar [options]\n"
-      "\n"
-      "The progress bar is a bit different, and slightly more complex than the other\n"
-      "controls. It has no return value, but reads input on stdin. It will continue to\n"
-      "display until it reads an EOF.\n"
-      "\n"
-      "Input for the progress bar is in the form: newPercent updated text to be\n"
-      "displayed and must be terminated by a newline. If you want to leave the current\n"
-      "text intact, just provide the new percent. newPercent should be a number.\n"
-      "\n"
-      "Examples (the first sets new text, the second leaves the old text):\n"
-      "  26 We're now at 26%\n"
-      "  26\n"
-      "\n"
-      "In your code it would like this: \"26 We're at 26%\\n\". That newline is\n"
-      "important.\n"
-      "\n"
-      "Options: (in addition to global options)\n"
-      "  --text \"initial text to display\"\n"
-      "      This is the text that will be initially displayed.\n"
-      "  --percent number\n"
-      "      Initial percentage, between 0 and 100, for the progress bar\n"
-      "  --indeterminate\n"
-      "      This option makes the progress bar an animated \"barbershop pole\" (for\n"
-      "      lack of better description). It does not indicate how far the operations\n"
-      "      you're performing have progressed; it just shows that your\n"
-      "      application/script is busy. You can still update the text of the label\n"
-      "      when writing to gtdialog's stdin - and it doesn't matter what percentage\n"
-      "      you feed it.\n";
+    puts(HELP(HELP_PROGRESSBAR,
+              HELP_PERCENT
+              HELP_TEXT_PROGRESSBAR
+              HELP_INDETERMINATE
+              HELP_STOPPABLE
+              HELP_FLOAT,
+              HELP_PROGRESSBAR_RETURN, HELP_PROGRESSBAR_EXAMPLE));
     break;
   case GTDIALOG_DROPDOWN:
-    msg =
-      "gtdialog dropdown [options]\n"
-      "\n"
-      "This control provides a dropdown list of items to select from and customizable\n"
-      "buttons. Values for the dropdown list must be provided. At least one button\n"
-      "(--button1) must be specified. If labels for the other buttons are not given,\n"
-      "the buttons will not appear on the message box.\n"
-      "\n"
-      "Buttons go from right to left. --button1 is the right-most button.\n"
-      "\n"
-      "returns: 1, 2, or 3 depending on which button was pressed; or the label of the\n"
-      "button if the --string-output option is given. Returns 4 (for both regular and\n"
-      "--string-output) if the user didn't press a button due to --exit-onchange. On\n"
-      "the following line will be the index (zero-based) of the selected item, or its\n"
-      "label if the --string-output option is given. On a timeout, it will return 0 or\n"
-      "timeout, and the selected item will not be returned.\n"
-      "\n"
-      "Also see the standard-dropdown.\n"
-      "\n"
-      "Options: (in addition to global options)\n"
-      "  --text \"main text message\"\n"
-      "      This is the main, bold message text.\n"
-      "  --items list of values\n"
-      "      required. These are the labels for the options provided in the dropdown\n"
-      "      box. list of values should be space separated, and given as multiple\n"
-      "      arguments (ie: don't double quote the entire list. Provide it as you\n"
-      "      would multiple arguments for any shell program).\n"
-      "      Example: gtdialog dropdown --text \"Favorite OS?\" --items \"GNU/Linux\"\n"
-      "      \"OS X\" Windows Amiga \"TI 89\" --button1 gtk-ok\n"
-      "  --pulldown\n"
-      "      Sets the style to a pull-down box, which differs slightly from the\n"
-      "      default pop-up style. The first item remains visible. This option\n"
-      "      probably isn't very useful for a single-function dialog such as those\n"
-      "      gtdialog provides, but I've included it just in case it is. To see how\n"
-      "      their appearances differ, just try them both.\n"
-      "  --button1\n"
-      "      required. This is the right-most button.\n"
-      "  --button2\n"
-      "      This is the middle button.\n"
-      "  --button3\n"
-      "      This is the left-most button. This will not be displayed if there is no\n"
-      "      --button2 label specified.\n"
-      "  --exit-onchange\n"
-      "      Makes the program exit immediately after the selection changes, rather\n"
-      "      than waiting for the user to press one of the buttons. This makes the\n"
-      "      return value for the button 4 (for both regular output and with\n"
-      "      --string-output).\n"
-      "  --selected index\n"
-      "      The zero-based index of the item in the list to select. The first item in\n"
-      "      the list is always selected by default.\n"
-      "  --float\n"
-      "      Float on top of all windows.\n"
-      "  --timeout numSeconds\n"
-      "      The amount of time, in seconds, that the window will be displayed if the\n"
-      "      user does not click a button. Does not time out by default.\n"
-      "\n"
-      "Example:\n"
-      "  gtdialog dropdown --title \"Preferred OS\" --no-newline \\\n"
-      "    --text \"What is your favorite OS?\" \\\n"
-      "    --items \"Mac OS X\" \"GNU/Linux\" \"Windows\" --button1 'That one!' \\\n"
-      "    --button2 Nevermind\n";
-    break;
   case GTDIALOG_STANDARD_DROPDOWN:
-    msg =
-      "gtdialog standard-dropdown [options]\n"
-      "\n"
-      "This control provides a dropdown list of items to select from and the standard\n"
-      "\"Ok\" and \"Cancel\" buttons. Values for the dropdown list must be provided.\n"
-      "\n"
-      "returns: 1 for ok, 2 for cancel, depending on which button was pressed; or\n"
-      "gtk-ok or gtk-cancel if the --string-output option is given. Returns 4 (for\n"
-      "both regular and --string-output) if the user didn't press a button due to\n"
-      "--exit-onchange. On the following line will be the index (zero-based) of the\n"
-      "selected item, or its label if the --string-output option is given. On a\n"
-      "timeout, it will return 0 or timeout, and the selected item will not be\n"
-      "returned.\n"
-      "\n"
-      "Options: (in addition to global options)\n"
-      "  --text \"main text message\"\n"
-      "      This is the main, bold message text.\n"
-      "  --items list of values\n"
-      "      required. These are the labels for the options provided in the dropdown\n"
-      "      box. list of values should be space separated, and given as multiple\n"
-      "      arguments (ie: don't double quote the entire list. Provide it as you\n"
-      "      would multiple arguments for any shell program).\n"
-      "      Example: gtdialog dropdown --text \"Favorite OS?\" --items \"GNU/Linux\"\n"
-      "      \"OS X\" Windows Amiga \"TI 89\" --button1 gtk-ok\n"
-      "  --pulldown\n"
-      "      Sets the style to a pull-down box, which differs slightly from the\n"
-      "      default pop-up style. The first item remains visible. This option\n"
-      "      probably isn't very useful for a single-function dialog such as those\n"
-      "      gtdialog provides, but I've included it just in case it is. To see how\n"
-      "      their appearances differ, just try them both.\n"
-      "  --selected index\n"
-      "      The zero-based index of the item in the list to select. The first item in\n"
-      "      the list is always selected by default.\n"
-      "  --exit-onchange\n"
-      "      Makes the program exit immediately after the selection changes, rather\n"
-      "      than waiting for the user to press one of the buttons. This makes the\n"
-      "      return value for the button 4 (for both regular output and with\n"
-      "      --string-output).\n"
-      "  --float\n"
-      "      Float on top of all windows.\n"
-      "  --timeout numSeconds\n"
-      "      The amount of time, in seconds, that the window will be displayed if the\n"
-      "      user does not click a button. Does not time out by default.\n";
+    puts(HELP(HELP_DROPDOWN,
+              HELP_TEXT_MAIN
+              HELP_ITEMS_DROPDOWN
+              HELP_BUTTON1
+              HELP_BUTTON2
+              HELP_BUTTON3
+              HELP_NO_CANCEL_DROPDOWN
+              HELP_EXIT_ONCHANGE
+              HELP_SELECT
+              HELP_FLOAT HELP_TIMEOUT,
+              HELP_DROPDOWN_RETURN, HELP_DROPDOWN_EXAMPLE));
     break;
   case GTDIALOG_FILTEREDLIST:
-    msg =
-      "gtdialog filteredlist [options]\n"
-      "\n"
-      "This control provides a list of items to filter through. Text entered into the\n"
-      "input box is matched case-sensitively to the first column of list items. Non-\n"
-      "matches are not displayed. Spaces (' ') are treated as globs ('*'), so \"f b\" is\n"
-      "represented as \"f*b\" and will match \"foobar\", \"fobar\", \"fbar\", etc.\n"
-      "\n"
-      "Options: (in addition to global options)\n"
-      "  --text \"main text message\"\n"
-      "      The initial text in the input box.\n"
-      "  --informative-text \"extra informative text to be displayed\"\n"
-      "      The text for the label above the input box.\n"
-      "  --columns list of columns\n"
-      "      Required. These are the names of the columns in the list. list of columns\n"
-      "      should be space separated and given as multiple arguments (ie: don't\n"
-      "      double quote the entire list. Provide it as you would multiple arguments\n"
-      "      for any shell program).\n"
-      "      Example: gtdialog filteredlist --columns Foo Bar --items foo bar\n"
-      "  --items list of items\n"
-      "      Required after --columns. These are the items in the list each inserted\n"
-      "      into the first empty column in the first non-full row. list of items\n"
-      "      should be space separated and given as multiple arguments (ie: don't\n"
-      "      double quote the entire list. Provide it as you would multiple arguments\n"
-      "      for any shell program).\n"
-      "  --search-column col\n"
-      "      Required after --columns. The column to use for searching. Default is 1.\n"
-      "  --output-column col\n"
-      "      The column to use for --string-output. Default is 1.\n"
-      "  --button1 \"label for button 1\"\n"
-      "      Required. The right-most button.\n"
-      "  --button2 \"label for button 2\"\n"
-      "      The middle button.\n"
-      "  --button3 \"label for button 3\"\n"
-      "      The left-most button. It will not be displayed if there is no --button2\n"
-      "      label specified.\n"
-      "  --select-multiple\n"
-      "      Allows the user to select more than one item. Default is to allow only one\n"
-      "      selection.\n"
-      "\n"
-      "Example:\n"
-      "  gtdialog filteredlist \\\n"
-      "    --columns Foo Bar \\\n"
-      "    --items foobar barfoo foobaz bazfoo barbaz bazbar \\\n"
-      "    --select-multiple\n";
+    puts(HELP(HELP_FILTEREDLIST,
+              HELP_INFORMATIVE_TEXT_MAIN
+              HELP_TEXT_INPUT
+              HELP_COLUMNS
+              HELP_ITEMS_FILTEREDLIST
+              HELP_BUTTON1
+              HELP_BUTTON2
+              HELP_BUTTON3
+              HELP_SELECT_MULTIPLE_FILTEREDLIST
+              HELP_SEARCH_COLUMN
+              HELP_OUTPUT_COLUMN
+              HELP_FLOAT HELP_TIMEOUT,
+              HELP_FILTEREDLIST_RETURN, HELP_FILTEREDLIST_EXAMPLE));
     break;
   default:
-    msg =
-      "Usage: gtdialog type [options]\n"
-      "  Available Types:\n"
-      "    msgbox, ok-msgbox, yesno-msgbox, inputbox, standard-inputbox,\n"
-      "    secure-inputbox, secure-standard-inputbox, fileselect, filesave,\n"
-      "    textbox, progressbar, dropdown, standard-dropdown, filteredlist\n"
-      "\n"
-      "  Global Options:\n"
-      "    --title \"text for title\"\n"
-      "        Sets the window's title\n"
-      "    --string-output\n"
-      "        Makes yes/no/ok/cancel buttons return values as \"gtk-yes\", \"gtk-no\",\n"
-      "        \"gtk-ok\", or \"gtk-cancel\" instead of integers. When used with custom\n"
-      "        button labels, returns the label you provided. If you use a GTK stock\n"
-      "        item, (ie: \"gtk-copy\") then that exact text is returned, not the text\n"
-      "        displayed on the button.\n"
-      "    --no-newline\n"
-      "        By default, return values will be printed with a trailing newline. This\n"
-      "        will suppress that behavior. Note that when a control returns multiple\n"
-      "        lines this will only suppress the trailing newline on the last line.\n"
-      "    --width integer\n"
-      "        Sets the width of the window. It's not advisable to use this option\n"
-      "        without good reason, and some controls won't even respond to it. The\n"
-      "        automatic size of most windows should suffice.\n"
-      "    --height integer\n"
-      "        Sets the height of the window. It's not advisable to use this option\n"
-      "        without good reason, and some controls won't even respond to it. The\n"
-      "        automatic size of most windows should suffice.\n"
-      "    --debug\n"
-      "        If you are not getting the results you expect, try turning on this\n"
-      "        option. When there is an error, it will print ERROR: followed by the\n"
-      "        error message. "
-      "    --help\n"
-      "        Gives a list of options and a link to this page.\n"
-      "\n"
-      "For detailed documentation: gtdialog help [type]"
-      "\n"
-      "Note that bubble mode is not supported, as well as the following options:\n"
-      "\"--icon\", \"--icon-file\", \"--select-directories\", \"--packages-as-directories\",\n"
-      "\"--no-create-directories\", and \"--pulldown\". The \"--debug\" flag does nothing\n"
-      "either.\n"
-      "\n"
-      "When the dialog receives a 'delete' event, (e.g. when the user presses the\n"
-      "Escape key) -1 or \"delete\" will be returned depending on --string-output.\n";
+    puts(HELP_ALL);
   }
-  printf(msg);
 #endif
   return 1;
 }
 
 #ifndef LIBRARY
+/**
+ * Runs gtdialog from the command line and prints its output to stdout.
+ * @param argc The number of command line parameters.
+ * @param argv The set of command line parameters for the dialog.
+ */
 int main(int argc, char *argv[]) {
-  if (argc == 1 || strcmp(argv[1], "help") == 0)
-    return error(argc, argv);
+  if (argc == 1 || strcmp(argv[1], "help") == 0) return help(argc, argv);
   int type = gtdialog_type(argv[1]);
-  if (type < 0)
-    return error(argc, argv);
+  if (type < 0) return help(argc, argv);
 #if GTK
   gtk_init(&argc, &argv);
 #elif NCURSES
@@ -1775,7 +1587,7 @@ int main(int argc, char *argv[]) {
 #if NCURSES
   endCDK();
 #endif
-  printf(out);
+  puts(out);
   free(out);
   return 0;
 }
