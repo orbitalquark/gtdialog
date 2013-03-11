@@ -153,7 +153,6 @@ static gboolean read_stdin(GIOChannel *ch, GIOCondition cond, gpointer data) {
       box = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
       GList *children = gtk_container_get_children(GTK_CONTAINER(box));
       progressbar = (GtkWidget *)children->data;
-      g_list_free(children);
       p = input;
       while (!isspace(*p)) p++;
       *p = '\0', p[strlen(p + 1)] = '\0'; // chomp '\n'
@@ -165,17 +164,18 @@ static gboolean read_stdin(GIOChannel *ch, GIOCondition cond, gpointer data) {
       if (*(p + 1))
         if (stoppable) {
           box = gtk_dialog_get_action_area(GTK_DIALOG(dialog));
-          children = gtk_container_get_children(GTK_CONTAINER(box));
-          button = (GtkWidget *)children->data;
-          g_list_free(children);
+          GList *children2 = gtk_container_get_children(GTK_CONTAINER(box));
+          button = (GtkWidget *)children2->data;
           if (strcmp(p + 1, "stop enable") == 0)
             gtk_widget_set_sensitive(button, TRUE);
           else if (strcmp(p + 1, "stop disable") == 0)
             gtk_widget_set_sensitive(button, FALSE);
           else
             gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), p + 1);
+          g_list_free(children2);
         } else gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), p + 1);
       free(input);
+      g_list_free(children);
     }
   } else g_signal_emit_by_name(dialog, "response", 2); // 1 is for Stop pressed
   return !(cond & G_IO_HUP);
