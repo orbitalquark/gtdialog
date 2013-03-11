@@ -221,6 +221,7 @@ static gboolean list_visible(GtkTreeModel *model, GtkTreeIter *iter,
   char *text = g_utf8_strdown(entry_text, -1);
   char *value, *lower, *p;
   gtk_tree_model_get(model, iter, search_col - 1, &value, -1);
+  if (!value) return TRUE; // no data yet
   lower = g_utf8_strdown(value, -1), p = lower;
   char **tokens = g_strsplit(text, " ", 0);
   gboolean visible = TRUE;
@@ -678,7 +679,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     // Create dialog content.
 #if GTK
     GtkWidget *vbox = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
-    if (text && type != GTDIALOG_PROGRESSBAR)
+    if (text && (type < GTDIALOG_INPUTBOX ||
+                 type > GTDIALOG_SECURE_STANDARD_INPUTBOX) &&
+        type != GTDIALOG_TEXTBOX && type != GTDIALOG_PROGRESSBAR &&
+        type != GTDIALOG_FILTEREDLIST)
       gtk_box_pack_start(GTK_BOX(vbox), gtk_label_new(text), FALSE, TRUE, 5);
     if (info_text && type != GTDIALOG_PROGRESSBAR)
       gtk_box_pack_start(GTK_BOX(vbox), gtk_label_new(info_text), FALSE, TRUE,
