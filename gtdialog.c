@@ -1452,11 +1452,11 @@ HELP_DROPDOWN HELP_FILTEREDLIST \
 "  for i in 25 50 75 100; do echo $i $i% done; sleep 1; done | \\\n" \
 "    gtdialog progressbar --title 'Status' --width 200 --stoppable\n"
 #define HELP_DROPDOWN_EXAMPLE \
-"  gtdialog dropdown --title 'Select Encoding' \\\n" \
+"  gtdialog dropdown --title 'Select Encoding' --width 200 \\\n" \
 "    --items UTF-8 ASCII ISO-8859-1 MacRoman --no-cancel --string-output \\\n" \
 "    --no-newline\n"
 #define HELP_FILTEREDLIST_EXAMPLE \
-"  gtdialog filteredlist --title Title --columns Foo Bar \\\\n" \
+"  gtdialog filteredlist --title Title --columns Foo Bar \\\n" \
 "    --items a b c d --no-newline\n"
 
 // Help template.
