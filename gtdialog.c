@@ -1,5 +1,5 @@
 /**
- * A CocoaDialog clone written in C using GTK or ncurses.
+ * A CocoaDialog clone written in C using GTK or curses.
  *
  * The MIT License
  *
@@ -30,7 +30,7 @@
 #include <string.h>
 #if GTK
 #include <gtk/gtk.h>
-#elif NCURSES
+#elif CURSES
 #include <unistd.h>
 #ifdef LIBRARY
 #include <termios.h>
@@ -56,7 +56,7 @@ static int indeterminate = FALSE, stoppable = FALSE, string_output = FALSE,
 #define STR_YES "gtk-yes"
 #define STR_NO "gtk-no"
 #define STR_STOP "gtk-stop"
-#elif NCURSES
+#elif CURSES
 #define STR_OK "Ok"
 #define STR_CANCEL "Cancel"
 #define STR_YES "Yes"
@@ -242,7 +242,7 @@ static gboolean list_visible(GtkTreeModel *model, GtkTreeIter *iter,
 static gboolean timeout_dialog(gpointer userdata) {
   return (g_signal_emit_by_name(userdata, "response", RESPONSE_TIMEOUT), FALSE);
 }
-#elif NCURSES
+#elif CURSES
 /**
  * Returns the number of lines the given string occupies when wrapped to fit the
  * given number of characters per line and sets the given pointer to the wrapped
@@ -284,7 +284,7 @@ static int buttonbox_tab(EObjectType cdkType, void *object, void *data,
   return TRUE;
 }
 
-/** The ncurses filteredlist model. */
+/** The curses filteredlist model. */
 typedef struct {
   /** The number of columns. */
   int ncols;
@@ -420,7 +420,7 @@ static int scrolled_key(EObjectType cdkType, void *object, void *data,
  * @return string result
  */
 char *gtdialog(GTDialogType type, int narg, const char *args[]) {
-#if NCURSES && LIBRARY
+#if CURSES && LIBRARY
   struct termios term;
   tcgetattr(0, &term); // store initial terminal settings
 #endif
@@ -445,7 +445,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
 
   // Dialog defaults.
-#if NCURSES
+#if CURSES
   height = 10, width = 40;
 #endif
   if (type == GTDIALOG_MSGBOX)
@@ -459,14 +459,14 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   else if (type == GTDIALOG_STANDARD_INPUTBOX ||
            type == GTDIALOG_SECURE_STANDARD_INPUTBOX)
     buttons[0] = STR_OK, buttons[1] = STR_CANCEL;
-#if NCURSES
+#if CURSES
   else if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
     height = 20;
 #endif
   else if (type == GTDIALOG_TEXTBOX)
 #if GTK
     height = 300, width = 400, buttons[0] = STR_OK;
-#elif NCURSES
+#elif CURSES
     height = 20, buttons[0] = STR_OK;
 #endif
   else if (type == GTDIALOG_PROGRESSBAR)
@@ -478,7 +478,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   else if (type == GTDIALOG_FILTEREDLIST)
 #if GTK
     height = 360, width = 500, buttons[0] = STR_OK;
-#elif NCURSES
+#elif CURSES
     height = 20, buttons[0] = STR_OK;
 #endif
 
@@ -614,7 +614,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           char *glob = g_strconcat((*ext == '.') ? "*" : "*.", ext, NULL);
           gtk_file_filter_add_pattern(filter, glob);
           g_free(glob);
-#elif NCURSES
+#elif CURSES
           // TODO:
 #endif
           i++;
@@ -631,7 +631,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if GTK
   GtkWidget *dialog, *entry, *textview, *progressbar, *combobox, *treeview;
   GtkListStore *list;
-#elif NCURSES
+#elif CURSES
   int cursor = curs_set(1); // enable cursor
   CDKSCREEN *dialog;
   CDKLABEL *labelt, *labeli;
@@ -653,7 +653,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     if (parent) gtk_window_set_transient_for(GTK_WINDOW(dialog), parent);
     if (floating) gtk_window_set_keep_above(GTK_WINDOW(dialog), TRUE);
     gtk_widget_set_size_request(GTK_WIDGET(dialog), width, height);
-#elif NCURSES
+#elif CURSES
     // There will be a border drawn later, but account for it now.
     dialog = initCDKScreen(newwin(height - 2, width - 2, 2, 2));
 #if LIBRARY
@@ -667,7 +667,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         if (buttons[i - 1])
           gtk_dialog_add_button(GTK_DIALOG(dialog), buttons[i - 1], i);
       gtk_dialog_set_default_response(GTK_DIALOG(dialog), 1);
-#elif NCURSES
+#elif CURSES
       int nbuttons = 0;
       for (i = 0; i < 3; i++) if (buttons[i]) nbuttons++;
       buttonbox = newCDKButtonbox(dialog, 0, BOTTOM, 1, 0, "", 1, nbuttons,
@@ -689,7 +689,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                          5);
 #endif
     if (type <= GTDIALOG_YESNO_MSGBOX) {
-#if NCURSES
+#if CURSES
       char **lines;
       int nlines;
       if (text) {
@@ -712,7 +712,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       if (type >= GTDIALOG_SECURE_INPUTBOX || no_show)
         gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
       if (text) gtk_entry_set_text(GTK_ENTRY(entry), text);
-#elif NCURSES
+#elif CURSES
       EDisplayType display = vMIXED;
       if (type >= GTDIALOG_SECURE_INPUTBOX || no_show) display = vHMIXED;
       entry = newCDKEntry(dialog, LEFT, TOP, (char *)title, (char *)info_text,
@@ -736,7 +736,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       if (font) gtk_widget_modify_font(textview, font);
       GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview));
       if (text) gtk_text_buffer_set_text(buffer, text, strlen(text));
-#elif NCURSES
+#elif CURSES
       EDisplayType display = editable ? vVIEWONLY : vMIXED;
       textview = newCDKMentry(dialog, LEFT, TOP, (char *)title,
                               (char *)info_text, A_NORMAL, '_', display, 0,
@@ -752,7 +752,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           rewind(f), fread(buf, 1, len, f), buf[len] = '\0';
 #if GTK
           gtk_text_buffer_set_text(buffer, buf, len);
-#elif NCURSES
+#elif CURSES
           setCDKMentryValue(textview, buf);
 #endif
           free(buf);
@@ -768,7 +768,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                               GTK_MOVEMENT_BUFFER_ENDS, 1, 0);
       if (selected)
         g_signal_emit_by_name(G_OBJECT(textview), "select-all", TRUE);
-#elif NCURSES
+#elif CURSES
       if (strcmp(scroll_to, "top") == 0)
         injectCDKMentry(textview, KEY_HOME);
       else
@@ -784,7 +784,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       else if (indeterminate)
         gtk_progress_bar_pulse(GTK_PROGRESS_BAR(progressbar));
       if (text) gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), text);
-#elif NCURSES
+#elif CURSES
 #endif
     } else if (type == GTDIALOG_DROPDOWN ||
                type == GTDIALOG_STANDARD_DROPDOWN) {
@@ -797,7 +797,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       for (i = 0; i < len; i++)
         gtk_combo_box_append_text(GTK_COMBO_BOX(combobox), items[i]);
       gtk_combo_box_set_active(GTK_COMBO_BOX(combobox), select);
-#elif NCURSES
+#elif CURSES
       combobox = newCDKItemlist(dialog, LEFT, TOP, (char *)title,
                                 (char *)info_text, (char **)items, len, 0,
                                 FALSE, FALSE);
@@ -849,7 +849,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         gtk_list_store_set(list, &iter, col++, items[i], -1);
         if (col == ncols) col = 0; // new row
       }
-#elif NCURSES
+#elif CURSES
       entry = newCDKEntry(dialog, LEFT, TOP, (char *)title, (char *)info_text,
                           A_NORMAL, '_', vMIXED, 0, 0, 100, FALSE, FALSE);
       char **rows = item_rows((char **)cols, ncols, (char **)items, len);
@@ -882,7 +882,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       if (select_only_dirs)
           gtk_file_chooser_set_action(GTK_FILE_CHOOSER(dialog),
                                       GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
-#elif NCURSES
+#elif CURSES
       dialog = initCDKScreen(newwin(height, width, 1, 1));
 #if LIBRARY
       tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
@@ -902,7 +902,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                                                      TRUE);
       if (no_create_dirs)
         gtk_file_chooser_set_create_folders(GTK_FILE_CHOOSER(dialog), FALSE);
-#elif NCURSES
+#elif CURSES
       dialog = initCDKScreen(newwin(height, width, 1, 1));
 #if LIBRARY
       tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
@@ -924,7 +924,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       g_free(path);
     } else if (with_file && type == GTDIALOG_FILESAVE)
       gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), with_file);
-#elif NCURSES
+#elif CURSES
     if (with_dir) setCDKFselectDirectory(fileselect, (char *)with_dir);
     if (with_file) {
       char *dir = dirName((char *)with_file);
@@ -948,7 +948,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       g_timeout_add_seconds(timeout, timeout_dialog, (gpointer)dialog);
     int response = gtk_dialog_run(GTK_DIALOG(dialog));
     if (response == GTK_RESPONSE_DELETE_EVENT) response = RESPONSE_DELETE;
-#elif NCURSES
+#elif CURSES
     WINDOW *border = newwin(height, width, 1, 1);
     box(border, 0, 0), wrefresh(border);
     refreshCDKScreen(dialog);
@@ -985,7 +985,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     else
       out = malloc(3), sprintf(out, "%i", response);
     if (type <= GTDIALOG_YESNO_MSGBOX) {
-#if NCURSES
+#if CURSES
       if (text) destroyCDKLabel(labelt);
       if (info_text) destroyCDKLabel(labeli);
 #endif
@@ -997,7 +997,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         if (type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
 #if GTK
           txt = (char *)gtk_entry_get_text(GTK_ENTRY(entry));
-#elif NCURSES
+#elif CURSES
           txt = copy(getCDKEntryValue(entry)), created = TRUE;
           destroyCDKEntry(entry);
 #endif
@@ -1013,7 +1013,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
             gtk_widget_modify_font(textview, NULL);
             pango_font_description_free(font);
           }
-#elif NCURSES
+#elif CURSES
           txt = copy(getCDKMentryValue(textview)), created = TRUE;
           destroyCDKMentry(textview);
 #endif
@@ -1022,7 +1022,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           if (string_output) {
 #if GTK
             txt = gtk_combo_box_get_active_text(GTK_COMBO_BOX(combobox));
-#elif NCURSES
+#elif CURSES
             if (len > 0)
               txt = (char *)items[getCDKItemlistCurrentItem(combobox)];
             destroyCDKItemlist(combobox);
@@ -1032,7 +1032,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
             sprintf(txt, "%i",
 #if GTK
                     gtk_combo_box_get_active(GTK_COMBO_BOX(combobox)));
-#elif NCURSES
+#elif CURSES
                     getCDKItemlistCurrentItem(combobox));
             destroyCDKItemlist(combobox);
 #endif
@@ -1046,7 +1046,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           txt = copy(gstr->str), created = TRUE;
           if (strlen(txt) > 0) txt[strlen(txt) - 1] = '\0'; // chomp '\n'
           g_string_free(gstr, TRUE);
-#elif NCURSES
+#elif CURSES
           if (getCDKScrollItems(scrolled, NULL) > 0) {
             i = getCDKScrollCurrentItem(scrolled);
             if (strlen(getCDKEntryValue(entry)) > 0) {
@@ -1094,7 +1094,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         g_slist_free_full(filenames, g_free);
       } else out = copy(gtk_file_chooser_get_filename(chooser));
     } else out = copy("");
-#elif NCURSES
+#elif CURSES
     const char *charset = getenv("CHARSET");
     if (!charset || !*charset) {
       char *locale = getenv("LC_ALL");
@@ -1145,7 +1145,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     out = copy("delete");
 #if GTK
   gtk_widget_destroy(dialog);
-#elif NCURSES
+#elif CURSES
   delwin(dialog->window);
   destroyCDKScreen(dialog);
   curs_set(cursor); // restore cursor
@@ -1298,7 +1298,7 @@ HELP_DROPDOWN HELP_FILTEREDLIST \
 #define HELP_NO_UTF8 \
 "  --no-utf8\n" \
 "      Do not automatically convert filenames to UTF-8.\n" \
-"      Only applicable in ncurses.\n"
+"      Only applicable in curses.\n"
 #define HELP_INFORMATIVE_TEXT_TEXTBOX \
 "  --informative-text str\n" \
 "      Informative message text.\n"
@@ -1584,11 +1584,11 @@ int main(int argc, char *argv[]) {
   if (type < 0) return help(argc, argv);
 #if GTK
   gtk_init(&argc, &argv);
-#elif NCURSES
+#elif CURSES
   initscr();
 #endif
   char *out = gtdialog(type, argc - 2, (const char **)&argv[2]);
-#if NCURSES
+#if CURSES
   endCDK();
 #endif
   puts(out);

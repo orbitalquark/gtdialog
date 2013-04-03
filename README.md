@@ -2,32 +2,42 @@
 
 ## Overview
 
-gtDialog is a cross-platform [cocoaDialog][] clone written in C using
-[GTK+ 2.0][] or [ncurses][]. You can use it as either a command-line program for
-shell scripts or C library for applications to easily create interactive dialogs
-for file selection, text input, yes/no confirmations, lists and more.
+gtDialog is a cross-platform application for creating interactive dialogs from
+the command line or with a C library. It is written completely in C and can
+display graphical dialogs using [GTK+ 2.0][] or terminal-based dialogs using
+a curses implementation like [ncurses][]. gtDialog is based on [cocoaDialog][]
+and shares many of its dialog types and arguments.
 
-[cocoaDialog]: http://cocoadialog.sf.net
+You can use gtDialog as either a standalone command-line program for shell
+scripts or a C library for applications in order to easily create interactive
+dialogs for yes/no confirmations, textual input, file selections, selection
+lists and more.
+
 [GTK+ 2.0]: http://gtk.org
 [ncurses]: http://invisible-island.net/ncurses/ncurses.html
+[cocoaDialog]: http://cocoadialog.sf.net
 
 ## Features
 
 * Cross-platform -- the GTK version runs on Linux, Windows, and Mac OSX.
-* Command-line program or C library for easily creating:
+* Graphical (GTK) or terminal-based (curses) dialogs.
+* 14 different dialog types including:
   + Messageboxes
   + Inputboxes
-  + File selection
-  + Textboxes
-  + Progressbars
+  + File selections
+  + Textbox
+  + Progressbar
   + Dropdown lists
   + Filtered lists
-* No knowledge of GTK or ncurses is required.
-* Command-line program is scripting language-agnostic.
+* No knowledge of GTK or curses is required to use either the command-line
+  program or C library.
+* Any programming language with shell access can utilize the command-line
+  program.
 
 ## Requirements
 
-gtDialog only requires GTK+ version 2.16 or higher or ncurses and [CDK][].
+gtDialog only requires GTK+ version 2.16 or higher or a curses implementation
+and [CDK][].
 
 [CDK]: http://invisible-island.net/cdk/
 
@@ -39,7 +49,7 @@ Download gtDialog from the project's [download page][].
 
 ## Installation and Usage
 
-gtDialog comes with a manual and API documentation in the `doc/` directory.
+gtDialog comes with a manual and API documentation in the *doc/* directory.
 They are also available [online][].
 
 [online]: http://foicica.com/gtdialog

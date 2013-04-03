@@ -1,10 +1,10 @@
 # Copyright 2009-2013 Mitchell mitchell.att.foicica.com.
 
-ifndef NCURSES
+ifndef CURSES
 FLAGS = -DGTK $(shell pkg-config --cflags gtk+-2.0)
 LIBS = $(shell pkg-config --libs gtk+-2.0)
 else
-FLAGS = -DNCURSES
+FLAGS = -DCURSES
 LIBS = -lncursesw -lcdk
 endif
 

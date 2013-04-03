@@ -1,5 +1,5 @@
 /**
- * A CocoaDialog clone written in C using GTK or ncurses.
+ * A CocoaDialog clone written in C using GTK or curses.
  *
  * The MIT License
  *
