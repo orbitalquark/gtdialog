@@ -32,8 +32,10 @@
 #include <gtk/gtk.h>
 #elif CURSES
 #include <unistd.h>
-#ifdef LIBRARY
+#if (LIBRARY && !_WIN32)
 #include <termios.h>
+#elif _WIN32
+#include <windows.h>
 #endif
 #include <iconv.h>
 #include <cdk.h>
@@ -356,6 +358,10 @@ static int entry_keypress(EObjectType cdkType, void *object, void *data,
   return TRUE;
 }
 
+#if _WIN32
+#define stpcpy(d, s) (strcpy(d, s), d + strlen(s))
+#endif
+
 /**
  * Creates and returns the set of display rows from the given list of columns,
  * number of columns, list of items, and number of items.
@@ -420,7 +426,7 @@ static int scrolled_key(EObjectType cdkType, void *object, void *data,
  * @return string result
  */
 char *gtdialog(GTDialogType type, int narg, const char *args[]) {
-#if CURSES && LIBRARY
+#if (CURSES && LIBRARY && !_WIN32)
   struct termios term;
   tcgetattr(0, &term); // store initial terminal settings
 #endif
@@ -430,7 +436,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       focus_textbox = FALSE, height = -1, no_create_dirs = FALSE,
       no_newline = FALSE, no_show = FALSE, no_utf8 = FALSE, percent = 0,
       select_multiple = FALSE, select_only_dirs = FALSE, select = 0,
-      selected = FALSE, timeout = 0, width = -1;
+      selected = FALSE, timeout_len = 0, width = -1;
   indeterminate = FALSE, stoppable = FALSE, string_output = FALSE;
   output_col = 1, search_col = 1;
   const char *buttons[3] = { NULL, NULL, NULL}, **cols = NULL,
@@ -594,7 +600,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       if (type == GTDIALOG_TEXTBOX) text_file = args[i++];
     } else if (strcmp(arg, "--timeout") == 0) {
       if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
-          type != GTDIALOG_PROGRESSBAR) timeout = atoi(args[i++]);
+          type != GTDIALOG_PROGRESSBAR) timeout_len = atoi(args[i++]);
     } else if (strcmp(arg, "--title") == 0) {
       title = args[i++];
     } else if (strcmp(arg, "--width") == 0) {
@@ -656,7 +662,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #elif CURSES
     // There will be a border drawn later, but account for it now.
     dialog = initCDKScreen(newwin(height - 2, width - 2, 2, 2));
-#if LIBRARY
+#if (LIBRARY && !_WIN32)
     tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
 #endif
 #endif
@@ -884,7 +890,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                                       GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
 #elif CURSES
       dialog = initCDKScreen(newwin(height, width, 1, 1));
-#if LIBRARY
+#if (LIBRARY && !_WIN32)
       tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
 #endif
       fileselect = newCDKFselect(dialog, LEFT, TOP, 0, 0, (char *)title,
@@ -904,7 +910,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         gtk_file_chooser_set_create_folders(GTK_FILE_CHOOSER(dialog), FALSE);
 #elif CURSES
       dialog = initCDKScreen(newwin(height, width, 1, 1));
-#if LIBRARY
+#if (LIBRARY && !_WIN32)
       tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
 #endif
       fileselect = newCDKFselect(dialog, LEFT, TOP, 0, 0, (char *)title,
@@ -944,8 +950,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       type != GTDIALOG_PROGRESSBAR) {
 #if GTK
     gtk_widget_show_all(dialog);
-    if (timeout)
-      g_timeout_add_seconds(timeout, timeout_dialog, (gpointer)dialog);
+    if (timeout_len)
+      g_timeout_add_seconds(timeout_len, timeout_dialog, (gpointer)dialog);
     int response = gtk_dialog_run(GTK_DIALOG(dialog));
     if (response == GTK_RESPONSE_DELETE_EVENT) response = RESPONSE_DELETE;
 #elif CURSES
@@ -1095,12 +1101,18 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       } else out = copy(gtk_file_chooser_get_filename(chooser));
     } else out = copy("");
 #elif CURSES
-    const char *charset = getenv("CHARSET");
+    const char *charset = NULL;
+#if (CURSES && !_WIN32)
+    charset = getenv("CHARSET");
     if (!charset || !*charset) {
       char *locale = getenv("LC_ALL");
       if (!locale || !*locale) locale = getenv("LANG");
       if (locale && (charset = strchr(locale, '.'))) charset++;
     }
+#elif (CURSES && WIN32)
+    char codepage[8];
+    sprintf(codepage, "CP%d", GetACP()), charset = codepage;
+#endif
     char *txt = activateCDKFselect(fileselect, NULL);
     if (txt) {
       size_t text_len = strlen(txt);
@@ -1146,8 +1158,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if GTK
   gtk_widget_destroy(dialog);
 #elif CURSES
-  delwin(dialog->window);
-  destroyCDKScreen(dialog);
+  delwin(dialog->window), destroyCDKScreen(dialog);
   curs_set(cursor); // restore cursor
   timeout(0), getch(), timeout(-1); // flush input
 #endif
