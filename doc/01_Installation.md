@@ -77,7 +77,11 @@ pretty ridiculous for a small application like gtDialog.
 
 For Linux systems, simply run `make` in the *src/* directory. The `gtdialog`
 executable is created in the current directory. To build the curses version,
-run `make CURSES=1`.
+run `make curses`.
+
+Note: if the build fails because *cdk.h* is not found and you know it is
+installed, you might have to manually patch *gtdialog.c* to use the right path
+(e.g. `#include <cdk/cdk.h>` instead of `#include <cdk.h>`).
 
 ##### Windows
 
@@ -100,8 +104,11 @@ This section applies to the command-line program only.
 
 ### Linux
 
-After compiling gtDialog, make a symlink from it to */usr/bin/* or elsewhere in
-your `PATH`.
+After compiling gtDialog, run the usual `make install` or `sudo make install`
+depending on your privilages. The default prefix is */usr/local* but you can
+change this by setting `DESTDIR` (e.g.
+`make install DESTDIR=/prefix/to/install/to`). Similarly, `make curses install`
+installs the curses version.
 
 ### Windows
 
