@@ -439,10 +439,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       selected = FALSE, timeout_len = 0, width = -1;
   indeterminate = FALSE, stoppable = FALSE, string_output = FALSE;
   output_col = 1, search_col = 1;
-  const char *buttons[3] = { NULL, NULL, NULL}, **cols = NULL,
-             *info_text = NULL, **items = NULL, *scroll_to = "top",
-             *text = NULL, *text_file = NULL, *title = "gtdialog",
-             *with_dir = NULL, *with_file = NULL;
+  const char *buttons[3] = { NULL, NULL, NULL}, **cols = NULL, *icon = NULL,
+             *icon_file = NULL, *info_text = NULL, **items = NULL,
+             *scroll_to = "top", *text = NULL, *text_file = NULL,
+             *title = "gtdialog", *with_dir = NULL, *with_file = NULL;
   // Other variables.
   int ncols = 0, len = 0;
 #if GTK
@@ -523,11 +523,11 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       int h = atoi(args[i++]);
       if (h > 0) height = h;
     } else if (strcmp(arg, "--icon") == 0) {
-      //if (type >= GTDIALOG_MSGBOX && type <= GTDIALOG_YESNO_MSGBOX)
-        // TODO: not implemented
+      if (type >= GTDIALOG_MSGBOX && type <= GTDIALOG_YESNO_MSGBOX)
+        icon = args[i++];
     } else if (strcmp(arg, "--icon-file") == 0) {
-      //if (type >= GTDIALOG_MSGBOX && type <= GTDIALOG_YESNO_MSGBOX)
-        // TODO: not implemented
+      if (type >= GTDIALOG_MSGBOX && type <= GTDIALOG_YESNO_MSGBOX)
+        icon_file = args[i++];
     } else if (strcmp(arg, "--indeterminate") == 0) {
       if (type == GTDIALOG_PROGRESSBAR) indeterminate = TRUE;
     } else if (strcmp(arg, "--informative-text") == 0) {
@@ -685,6 +685,27 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     // Create dialog content.
 #if GTK
     GtkWidget *vbox = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+    if (icon || icon_file) {
+      // Spacing, border width, and alignment match GtkMessageDialogs'.
+      GtkWidget *hbox = gtk_hbox_new(FALSE, 12);
+      gtk_container_set_border_width(GTK_CONTAINER(hbox), 5);
+      gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
+      GtkWidget *image = NULL;
+      if (icon)
+        image = gtk_image_new_from_stock(icon, GTK_ICON_SIZE_DIALOG);
+      else
+        image = gtk_image_new_from_file(icon_file);
+#if GTK_CHECK_VERSION(3,0,0)
+      gtk_widget_set_halign(image, GTK_ALIGN_CENTER);
+      gtk_widget_set_valign(image, GTK_ALIGN_START);
+#else
+      gtk_misc_set_alignment(GTK_MISC(image), 0.5, 0.0);
+#endif
+      gtk_box_pack_start(GTK_BOX(hbox), image, FALSE, FALSE, 0);
+      GtkWidget *vbox2 = gtk_vbox_new(FALSE, 0);
+      gtk_box_pack_start(GTK_BOX(hbox), vbox2, TRUE, TRUE, 0);
+      vbox = vbox2;
+    }
     if (text && (type < GTDIALOG_INPUTBOX ||
                  type > GTDIALOG_SECURE_STANDARD_INPUTBOX) &&
         type != GTDIALOG_TEXTBOX && type != GTDIALOG_PROGRESSBAR &&
@@ -1094,10 +1115,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         GSList *filenames = gtk_file_chooser_get_filenames(chooser), *i = NULL;
         for (i = filenames; i; i = i->next) {
           char *new_out = g_strconcat(out, "\n", (char *)i->data, NULL);
-          free(out);
+          free(out), g_free(i->data);
           out = new_out;
         }
-        g_slist_free_full(filenames, g_free);
+        g_slist_free(filenames);
       } else out = copy(gtk_file_chooser_get_filename(chooser));
     } else out = copy("");
 #elif CURSES
@@ -1237,6 +1258,16 @@ HELP_DROPDOWN HELP_FILTEREDLIST \
 #define HELP_INFORMATIVE_TEXT_EXTRA \
 "  --informative-text str\n" \
 "      Extra informative text.\n"
+#define HELP_ICON \
+"  --icon str\n" \
+"      The name of the GTK stock icon to display. No icon is displayed\n" \
+"      by default.\n" \
+"      Examples are “gtk-dialog-error”, “gtk-dialog-info”,\n" \
+"      “gtk-dialog-question”, and “gtk-dialog-warning”.\n"
+#define HELP_ICON_FILE \
+"  --icon-file str\n" \
+"      The path to the icon to display.\n" \
+"      Has no effect when --icon is present.\n"
 #define HELP_BUTTON1_MSGBOX \
 "  --button1 str\n" \
 "      The right-most button's label. The default is “Ok” for ok-msgbox and\n" \
@@ -1400,6 +1431,11 @@ HELP_DROPDOWN HELP_FILTEREDLIST \
 "the dialog. If --string-output was given, the return string contains the\n" \
 "label of the button pressed, “timeout” if the dialog timed out, or\n" \
 "“delete” if the user canceled the dialog.\n"
+#define HELP_LOCALIZED_BUTTONS \
+"\nFor GTK only, button labels with GTK stock item labels are automatically\n" \
+"localized. However, when --string-output is given, the stock item label is\n" \
+"returned, not the actual, localized label. The default button labels are\n" \
+"all stock item labels (“gtk-ok”, “gtk-cancel”, “gtk-yes”, and “gtk-no”).\n"
 #define HELP_INPUTBOX_RETURN \
 "The input dialogs return a string containing the number of the button\n" \
 "pressed followed by a newline character (‘\\n’) and the input text, ‘0’ if\n" \
@@ -1488,12 +1524,16 @@ int help(int argc, char *argv[]) {
     puts(HELP(HELP_MSGBOX,
               HELP_TEXT_MAIN
               HELP_INFORMATIVE_TEXT_EXTRA
+              HELP_ICON
+              HELP_ICON_FILE
               HELP_BUTTON1_MSGBOX
               HELP_BUTTON2_MSGBOX
               HELP_BUTTON3_MSGBOX
               HELP_NO_CANCEL_MSGBOX
               HELP_FLOAT HELP_TIMEOUT,
-              HELP_MSGBOX_RETURN, HELP_MSGBOX_EXAMPLE));
+              HELP_MSGBOX_RETURN
+              HELP_LOCALIZED_BUTTONS,
+              HELP_MSGBOX_EXAMPLE));
     break;
   case GTDIALOG_INPUTBOX:
   case GTDIALOG_STANDARD_INPUTBOX:
@@ -1508,7 +1548,9 @@ int help(int argc, char *argv[]) {
               HELP_BUTTON3_INPUTBOX
               HELP_NO_CANCEL_INPUTBOX
               HELP_FLOAT HELP_TIMEOUT,
-              HELP_INPUTBOX_RETURN, HELP_INPUTBOX_EXAMPLE));
+              HELP_INPUTBOX_RETURN
+              HELP_LOCALIZED_BUTTONS,
+              HELP_INPUTBOX_EXAMPLE));
     break;
   case GTDIALOG_FILESELECT:
   case GTDIALOG_FILESAVE:
@@ -1520,7 +1562,8 @@ int help(int argc, char *argv[]) {
               HELP_SELECT_ONLY_DIRECTORIES
               HELP_NO_CREATE_DIRECTORIES
               HELP_NO_UTF8,
-              HELP_FILE_RETURN, HELP_FILE_EXAMPLE));
+              HELP_FILE_RETURN,
+              HELP_FILE_EXAMPLE));
     break;
   case GTDIALOG_TEXTBOX:
     puts(HELP(HELP_TEXTBOX,
@@ -1536,7 +1579,9 @@ int help(int argc, char *argv[]) {
               HELP_SELECTED
               HELP_MONOSPACED_FONT
               HELP_FLOAT HELP_TIMEOUT,
-              HELP_TEXTBOX_RETURN, HELP_TEXTBOX_EXAMPLE));
+              HELP_TEXTBOX_RETURN
+              HELP_LOCALIZED_BUTTONS,
+              HELP_TEXTBOX_EXAMPLE));
     break;
   case GTDIALOG_PROGRESSBAR:
     puts(HELP(HELP_PROGRESSBAR,
@@ -1545,7 +1590,8 @@ int help(int argc, char *argv[]) {
               HELP_INDETERMINATE
               HELP_STOPPABLE
               HELP_FLOAT,
-              HELP_PROGRESSBAR_RETURN, HELP_PROGRESSBAR_EXAMPLE));
+              HELP_PROGRESSBAR_RETURN,
+              HELP_PROGRESSBAR_EXAMPLE));
     break;
   case GTDIALOG_DROPDOWN:
   case GTDIALOG_STANDARD_DROPDOWN:
@@ -1559,7 +1605,9 @@ int help(int argc, char *argv[]) {
               HELP_EXIT_ONCHANGE
               HELP_SELECT
               HELP_FLOAT HELP_TIMEOUT,
-              HELP_DROPDOWN_RETURN, HELP_DROPDOWN_EXAMPLE));
+              HELP_DROPDOWN_RETURN
+              HELP_LOCALIZED_BUTTONS,
+              HELP_DROPDOWN_EXAMPLE));
     break;
   case GTDIALOG_FILTEREDLIST:
     puts(HELP(HELP_FILTEREDLIST,
@@ -1574,7 +1622,9 @@ int help(int argc, char *argv[]) {
               HELP_SEARCH_COLUMN
               HELP_OUTPUT_COLUMN
               HELP_FLOAT HELP_TIMEOUT,
-              HELP_FILTEREDLIST_RETURN, HELP_FILTEREDLIST_EXAMPLE));
+              HELP_FILTEREDLIST_RETURN
+              HELP_LOCALIZED_BUTTONS,
+              HELP_FILTEREDLIST_EXAMPLE));
     break;
   default:
     puts(HELP_ALL);
