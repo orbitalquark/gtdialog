@@ -3,7 +3,7 @@
 ## Overview
 
 gtDialog is a cross-platform application for creating interactive dialogs from
-the command line or with a C library. It is written completely in C and can
+the command line or programmatically. It is written completely in C and can
 display graphical dialogs using [GTK+ 2.0][] or terminal-based dialogs using
 a curses implementation like [ncurses][]. gtDialog is based on [cocoaDialog][]
 and shares many of its dialog types and arguments.
@@ -19,7 +19,6 @@ lists and more.
 
 ## Features
 
-* Cross-platform -- the GTK version runs on Linux, Windows, and Mac OSX.
 * Graphical (GTK) or terminal-based (curses) dialogs.
 * 14 different dialog types including:
   + Messageboxes

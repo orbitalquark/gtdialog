@@ -4,27 +4,31 @@
 
 The [GTK+][] version of gtDialog only requires GTK+ version 2.16 or higher. It
 runs on Linux, Windows, and Mac OSX, provided a GTK runtime is available.
-Installing and configuring the runtime is beyond the scope of this document.
+Installing and configuring the runtime is beyond the scope of this document, but
+[Textadept][] bundles in a GTK runtime so you can use that for reference.
 
-The [ncurses][] version of gtDialog requires ncurses and [CDK][] and runs on
-Linux and probably Mac OSX.
+The curses version of gtDialog requires only a curses implementation (like
+[ncurses][] or [pdcurses][]) and [CDK][] and runs on Linux, Windows, and Mac
+OSX.
 
 [GTK+]: http://gtk.org
+[Textadept]: http://foicica.com/textadept
 [ncurses]: http://invisible-island.net/ncurses/ncurses.html
+[pdcurses]: http://pdcurses.sourceforge.net
 [CDK]: http://invisible-island.net/cdk/
 
 ## Download
 
-Download gtDialog from the [project page][].
+Download gtDialog from the project's [download page][].
 
-[project page]: http://foicica.com/gtdialog
+[download page]: http://foicica.com/gtdialog/download
 
 ## Compiling
 
 Compiling the command-line program is currently only supported on Linux systems.
 If you want to try and compile for Windows or Mac OSX, please see the
-[Textadept][] project which compiles gtDialog as a C library in the
-`src/Makefile` file.
+[Textadept][] project which compiles gtDialog as a C library in its
+*src/Makefile* file.
 
 [Textadept]: http://foicica.com/textadept
 
@@ -50,18 +54,17 @@ tools in the `build-essential` package.
 
 #### Windows
 
-You need a C compiler that supports the C99 standard (Microsoft's does not) and
-the [GTK+ for Windows bundle][] (2.24 is recommended).
+You need a C compiler and the [GTK+ for Windows bundle][] (2.24 is recommended).
 
 [GTK+ for Windows bundle]: http://www.gtk.org/download/win32.html
 
 #### Mac OSX
 
-For GTK gtDialog, [XCode][] is needed for Mac OSX as well as [jhbuild][]. After
-building `meta-gtk-osx-bootstrap` and `meta-gtk-osx-core`, you need to build
-`meta-gtk-osx-themes`. Note that the entire compiling process can easily take 30
-minutes or more and ultimately consume nearly 1GB of disk space. This is pretty
-ridiculous for a small application like gtDialog.
+For native GTK gtDialog, [XCode][] is needed for Mac OSX as well as [jhbuild][].
+After building `meta-gtk-osx-bootstrap` and `meta-gtk-osx-core`, you need to
+build `meta-gtk-osx-themes`. Note that the entire compiling process can easily
+take 30 minutes or more and ultimately consume nearly 1GB of disk space. This is
+pretty ridiculous for a small application like gtDialog.
 
 [XCode]: http://developer.apple.com/TOOLS/xcode/
 [jhbuild]: http://sourceforge.net/apps/trac/gtk-osx/wiki/Build
@@ -72,9 +75,9 @@ ridiculous for a small application like gtDialog.
 
 ##### Linux
 
-For Linux systems, simply run `make` in the `src/` directory. The `gtdialog`
-executable is created in the current directory. To build the ncurses version,
-run `make NCURSES=1`.
+For Linux systems, simply run `make` in the *src/* directory. The `gtdialog`
+executable is created in the current directory. To build the curses version,
+run `make CURSES=1`.
 
 ##### Windows
 
@@ -86,10 +89,10 @@ Unsupported.
 
 #### C Library
 
-Include both `gtdialog.h` and `gtdialog.c` in your project and compile
-`gtdialog.c` with the either `GTK` or `NCURSES` flag and optionally the `NOHELP`
+Include both *gtdialog.h* and *gtdialog.c* in your project and compile
+*gtdialog.c* with either the `GTK` or `CURSES` flag and optionally the `NOHELP`
 and `LIBRARY` flags to disable printing help messages to `stdout` and ignoring
-the `main()` function.
+the `main()` function, respectively.
 
 ## Installation
 
@@ -97,7 +100,7 @@ This section applies to the command-line program only.
 
 ### Linux
 
-After compiling gtDialog, make a symlink from it to `/usr/bin/` or elsewhere in
+After compiling gtDialog, make a symlink from it to */usr/bin/* or elsewhere in
 your `PATH`.
 
 ### Windows

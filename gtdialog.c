@@ -1485,6 +1485,7 @@ HELP_DROPDOWN HELP_FILTEREDLIST \
 // Help with dialog examples.
 #define HELP_MSGBOX_EXAMPLE \
 "  gtdialog msgbox --title 'EOL Mode' --text 'Which EOL?' \\\n" \
+"    --icon gtk-dialog-question \\\n" \
 "    --button1 CRLF --button2 CR --button3 LF\n"
 #define HELP_INPUTBOX_EXAMPLE \
 "  gtdialog standard-inputbox --title 'Goto Line' \\\n" \
