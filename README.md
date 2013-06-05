@@ -42,9 +42,12 @@ and [CDK][].
 
 ## Download
 
-Download gtDialog from the project's [download page][].
+Download gtDialog from the project's [download page][] or from this quick link:
+
+* [Source][]
 
 [download page]: http://foicica.com/gtdialog/download
+[Source]: download/gtdialog_LATEST.zip
 
 ## Installation and Usage
 
