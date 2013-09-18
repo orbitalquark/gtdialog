@@ -44,12 +44,12 @@
 #include "gtdialog.h"
 
 #if GTK
-static GtkWindow *parent = NULL;
+static GtkWindow *parent;
 #endif
 static int RESPONSE_DELETE = -1, RESPONSE_TIMEOUT = 0, RESPONSE_CHANGE = 4;
 // Options used by other functions.
-static int indeterminate = FALSE, stoppable = FALSE, string_output = FALSE,
-           output_col = 1, search_col = 1;
+static int indeterminate, stoppable, string_output, output_col = 1,
+           search_col = 1;
 
 // Default button labels.
 #if GTK
@@ -434,9 +434,9 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   // Dialog options.
   int editable = FALSE, exit_onchange = FALSE, floating = FALSE,
       focus_textbox = FALSE, height = -1, no_create_dirs = FALSE,
-      no_newline = FALSE, no_show = FALSE, no_utf8 = FALSE, percent = 0,
-      select_multiple = FALSE, select_only_dirs = FALSE, select = 0,
-      selected = FALSE, timeout_len = 0, width = -1;
+      no_newline = FALSE, no_show = FALSE, percent = 0, select_multiple = FALSE,
+      select_only_dirs = FALSE, select = 0, selected = FALSE, timeout_len = 0,
+      width = -1;
   indeterminate = FALSE, stoppable = FALSE, string_output = FALSE;
   output_col = 1, search_col = 1;
   const char *buttons[3] = { NULL, NULL, NULL}, **cols = NULL, *icon = NULL,
@@ -557,9 +557,6 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     } else if (strcmp(arg, "--no-show") == 0) {
       if (type >= GTDIALOG_INPUTBOX &&
           type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) no_show = TRUE;
-    } else if (strcmp(arg, "--no-utf8") == 0) {
-      if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
-        no_utf8 = TRUE;
     } else if (strcmp(arg, "--output-column") == 0) {
       if (type == GTDIALOG_FILTEREDLIST) {
         output_col = atoi(args[i++]);
@@ -1135,23 +1132,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     sprintf(codepage, "CP%d", GetACP()), charset = codepage;
 #endif
     char *txt = activateCDKFselect(fileselect, NULL);
-    if (txt) {
-      size_t text_len = strlen(txt);
-      char *iconv_out = malloc(text_len + 1);
-      if (!no_utf8) {
-        // Convert to UTF-8.
-        iconv_t cd = iconv_open("UTF-8", charset);
-        if (cd != (iconv_t)-1) {
-          char *inp = txt, *outp = iconv_out;
-          size_t inbytesleft = text_len, outbytesleft = text_len;
-          if (iconv(cd, &inp, &inbytesleft, &outp, &outbytesleft) != -1)
-            txt = iconv_out, txt[outp - iconv_out] = '\0';
-          iconv_close(cd);
-        }
-      }
-      out = copy(txt);
-      free(iconv_out);
-    } else out = copy("");
+    out = txt ? copy(txt) : copy("");
     destroyCDKFselect(fileselect);
     chdir(cwd);
 #endif
@@ -1337,10 +1318,6 @@ HELP_DROPDOWN HELP_FILTEREDLIST \
 #define HELP_NO_CREATE_DIRECTORIES \
 "  --no-create-directories\n" \
 "      Prevent the user from creating new directories in filesave.\n"
-#define HELP_NO_UTF8 \
-"  --no-utf8\n" \
-"      Do not automatically convert filenames to UTF-8.\n" \
-"      Only applicable in curses.\n"
 #define HELP_INFORMATIVE_TEXT_TEXTBOX \
 "  --informative-text str\n" \
 "      Informative message text.\n"
@@ -1561,8 +1538,7 @@ int help(int argc, char *argv[]) {
               HELP_WITH_EXTENSION
               HELP_SELECT_MULTIPLE_FILESELECT
               HELP_SELECT_ONLY_DIRECTORIES
-              HELP_NO_CREATE_DIRECTORIES
-              HELP_NO_UTF8,
+              HELP_NO_CREATE_DIRECTORIES,
               HELP_FILE_RETURN,
               HELP_FILE_EXAMPLE));
     break;
