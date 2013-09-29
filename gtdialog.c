@@ -560,10 +560,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     } else if (strcmp(arg, "--output-column") == 0) {
       if (type == GTDIALOG_FILTEREDLIST) {
         output_col = atoi(args[i++]);
-        if (output_col > ncols)
-          output_col = ncols;
-        else if (output_col < 1)
-          output_col = 1;
+        if (output_col < 1) output_col = 1;
       }
     } else if (strcmp(arg, "--percent") == 0) {
       if (type == GTDIALOG_PROGRESSBAR) percent = atoi(args[i++]);
@@ -572,10 +569,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     } else if (strcmp(arg, "--search-column") == 0) {
       if (type == GTDIALOG_FILTEREDLIST) {
         search_col = atoi(args[i++]);
-        if (search_col > ncols)
-          search_col = ncols;
-        else if (search_col < 1)
-          search_col = 1;
+        if (search_col < 1) search_col = 1;
       }
     } else if (strcmp(arg, "--select-multiple") == 0) {
       if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILTEREDLIST)
@@ -629,6 +623,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     }
     arg = args[i++];
   }
+  if (output_col > ncols) output_col = ncols;
+  if (search_col > ncols) search_col = ncols;
 
   // Create dialog.
 #if GTK
@@ -1395,11 +1391,11 @@ HELP_DROPDOWN HELP_FILTEREDLIST \
 #define HELP_SEARCH_COLUMN \
 "  --search-column int\n" \
 "      The column number to filter the input text against. The default is\n" \
-"      0.\n" \
+"      1.\n" \
 "      Requires --columns.\n"
 #define HELP_OUTPUT_COLUMN \
 "  --output-column int\n" \
-"      The column number to use for --string-output. The default is 0.\n"
+"      The column number to use for --string-output. The default is 1.\n"
 
 // Help on dialog returns.
 #define HELP_MSGBOX_RETURN \
