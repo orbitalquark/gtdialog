@@ -68,9 +68,13 @@ static int indeterminate, stoppable, string_output, output_col = 1,
 
 #if GTK
 #if GTK_CHECK_VERSION(3,0,0)
+#define gtk_hbox_new(_,s) gtk_box_new(GTK_ORIENTATION_HORIZONTAL, s)
+#define gtk_vbox_new(_,s) gtk_box_new(GTK_ORIENTATION_VERTICAL, s)
 #define gtk_combo_box_new_text gtk_combo_box_text_new
-#define gtk_combo_box_append_text gtk_combo_box_text_append_text
-#define gtk_combo_box_get_active_text gtk_combo_box_text_get_active_text
+#define gtk_combo_box_append_text(w,t) \
+  gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(w),t)
+#define gtk_combo_box_get_active_text(w) \
+  gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(w))
 #endif
 #endif
 #define copy(s) strcpy(malloc(strlen(s) + 1), s)
