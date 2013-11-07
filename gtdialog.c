@@ -784,12 +784,13 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         }
       }
 #if GTK
-      if (strcmp(scroll_to, "top") == 0)
-        g_signal_emit_by_name(G_OBJECT(textview), "move-cursor",
-                              GTK_MOVEMENT_BUFFER_ENDS, -1, 0);
-      else
-        g_signal_emit_by_name(G_OBJECT(textview), "move-cursor",
-                              GTK_MOVEMENT_BUFFER_ENDS, 1, 0);
+      if (strcmp(scroll_to, "bottom") == 0) {
+        GtkTextView *view = GTK_TEXT_VIEW(textview);
+        GtkTextBuffer *buffer = gtk_text_view_get_buffer(view);
+        gtk_text_view_scroll_mark_onscreen(view,
+                                           gtk_text_buffer_get_insert(buffer));
+      } else g_signal_emit_by_name(G_OBJECT(textview), "move-cursor",
+                                   GTK_MOVEMENT_BUFFER_ENDS, -1, 0);
       if (selected)
         g_signal_emit_by_name(G_OBJECT(textview), "select-all", TRUE);
 #elif CURSES
@@ -1027,8 +1028,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
         } else if (type == GTDIALOG_TEXTBOX && editable) {
 #if GTK
-          GtkTextBuffer *buffer = //TODO: reformat
-            gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview));
+          GtkTextView *view = GTK_TEXT_VIEW(textview);
+          GtkTextBuffer *buffer = gtk_text_view_get_buffer(view);
           GtkTextIter s, e;
           gtk_text_buffer_get_start_iter(buffer, &s);
           gtk_text_buffer_get_end_iter(buffer, &e);
