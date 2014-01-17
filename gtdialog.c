@@ -45,6 +45,8 @@
 
 #if GTK
 static GtkWindow *parent;
+#else
+static CDKENTRY *focused_entry;
 #endif
 static int RESPONSE_DELETE = -1, RESPONSE_TIMEOUT = 0, RESPONSE_CHANGE = 4;
 // Options used by other functions.
@@ -284,10 +286,22 @@ static int wrap(char *str, int w, char ***plines) {
 }
 
 /** Signal for the 'tab' and 'shift+tab' keys being pressed. */
+static int entries_tab(EObjectType cdkType, void *object, void *data,
+                       chtype key) {
+  CDKENTRY *entry = (CDKENTRY *)object, **entries = (CDKENTRY **)data;
+  int i = 0, len = 0;
+  for (len = 0; entries[len]; len++) if (entries[len] == entry) i = len;
+  if (key == KEY_TAB || key == KEY_DOWN)
+    focused_entry = entries[i + 1];
+  else
+    focused_entry = (i > 0) ? entries[i - 1] : entries[len - 1];
+  return (injectCDKEntry(entry, KEY_ENTER), TRUE);
+}
+
+/** Signal for the 'tab' and 'shift+tab' keys being pressed. */
 static int buttonbox_tab(EObjectType cdkType, void *object, void *data,
                          chtype key) {
-  injectCDKButtonbox((CDKBUTTONBOX *)data, key);
-  return TRUE;
+  return (injectCDKButtonbox((CDKBUTTONBOX *)data, key), TRUE);
 }
 
 /** The curses filteredlist model. */
@@ -443,12 +457,13 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       width = -1;
   indeterminate = FALSE, stoppable = FALSE, string_output = FALSE;
   output_col = 1, search_col = 1;
-  const char *buttons[3] = { NULL, NULL, NULL}, **cols = NULL, *icon = NULL,
-             *icon_file = NULL, *info_text = NULL, **items = NULL,
-             *scroll_to = "top", *text = NULL, *text_file = NULL,
-             *title = "gtdialog", *with_dir = NULL, *with_file = NULL;
+  const char *buttons[3] = {NULL, NULL, NULL}, **cols = NULL, *icon = NULL,
+             *icon_file = NULL, *info_text = NULL, **info_texts = NULL,
+             **items = NULL, *scroll_to = "top", *text = NULL, **texts = NULL,
+             *text_file = NULL, *title = "gtdialog", *with_dir = NULL,
+             *with_file = NULL;
   // Other variables.
-  int ncols = 0, len = 0;
+  int ncols = 0, nrows = 0, len = 0;
 #if GTK
   PangoFontDescription *font = NULL;
   GtkFileFilter *filter = NULL;
@@ -536,7 +551,14 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       if (type == GTDIALOG_PROGRESSBAR) indeterminate = TRUE;
     } else if (strcmp(arg, "--informative-text") == 0) {
       if (type < GTDIALOG_FILESELECT || type == GTDIALOG_TEXTBOX ||
-          type == GTDIALOG_FILTEREDLIST) info_text = args[i++];
+          type == GTDIALOG_FILTEREDLIST) {
+        info_text = args[i++];
+        if (type >= GTDIALOG_INPUTBOX ||
+            type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
+          info_texts = &args[i], nrows = 0; // for multiple inputboxes, if any
+          while (i < narg && strncmp(args[i], "--", 2) != 0) nrows++, i++;
+        }
+      }
     } else if (strcmp(arg, "--items") == 0) {
       items = &args[i], len = 0;
       while (i < narg && strncmp(args[i], "--", 2) != 0) len++, i++;
@@ -591,6 +613,11 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       string_output = TRUE;
     } else if (strcmp(arg, "--text") == 0) {
       text = args[i++];
+      if (type >= GTDIALOG_INPUTBOX &&
+          type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
+        texts = &args[i - 1], len = 1; // for multiple inputboxes, if any
+        while (i < narg && strncmp(args[i], "--", 2) != 0) i++, len++;
+      }
     } else if (strcmp(arg, "--text-from-file") == 0) {
       if (type == GTDIALOG_TEXTBOX) text_file = args[i++];
     } else if (strcmp(arg, "--timeout") == 0) {
@@ -632,19 +659,20 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 
   // Create dialog.
 #if GTK
-  GtkWidget *dialog, *entry, *textview, *progressbar, *combobox, *treeview;
+  GtkWidget *dialog, *entry, *entries[nrows], *textview, *progressbar,
+            *combobox, *treeview;
   GtkListStore *list;
 #elif CURSES
   int cursor = curs_set(1); // enable cursor
   CDKSCREEN *dialog;
   CDKLABEL *labelt, *labeli;
-  CDKENTRY *entry;
+  CDKENTRY *entry, *entries[nrows + 1];
   CDKMENTRY *textview;
 //  CDKSLIDER *progressbar;
   CDKITEMLIST *combobox;
   CDKBUTTONBOX *buttonbox;
   CDKSCROLL *scrolled;
-  Model model = { ncols, search_col, (char **)items, len, NULL, 0, NULL, NULL };
+  Model model = {ncols, search_col, (char **)items, len, NULL, 0, NULL, NULL};
   CDKFSELECT *fileselect;
   char cwd[FILENAME_MAX];
   getcwd(cwd, FILENAME_MAX);
@@ -730,20 +758,66 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     } else if (type >= GTDIALOG_INPUTBOX &&
                type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
 #if GTK
-      entry = gtk_entry_new();
-      gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
-      gtk_box_pack_start(GTK_BOX(vbox), entry, FALSE, TRUE, 5);
-      if (type >= GTDIALOG_SECURE_INPUTBOX || no_show)
-        gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
-      if (text) gtk_entry_set_text(GTK_ENTRY(entry), text);
+      if (nrows < 2) {
+        // Single entry inputbox.
+        entry = gtk_entry_new();
+        gtk_entry_set_activates_default(GTK_ENTRY(entry), TRUE);
+        gtk_box_pack_start(GTK_BOX(vbox), entry, FALSE, TRUE, 5);
+        if (type >= GTDIALOG_SECURE_INPUTBOX || no_show)
+          gtk_entry_set_visibility(GTK_ENTRY(entry), FALSE);
+        if (text) gtk_entry_set_text(GTK_ENTRY(entry), text);
+      } else {
+        // Multiple entry inputbox.
+#if !GTK_CHECK_VERSION(3,4,0)
+        GtkWidget *table = gtk_table_new(nrows, 2, FALSE);
+#define attach(...) gtk_table_attach(GTK_TABLE(table), __VA_ARGS__)
+#define FILL(o) (GtkAttachOptions)(GTK_FILL | GTK_##o)
+#else
+        GtkWidget *table = gtk_grid_new();
+        gtk_grid_set_column_spacing(GTK_GRID(table), 5);
+#define attach(w, x1, _, y1, __, ...) \
+  gtk_grid_attach(GTK_GRID(table), w, x1, y1, 1, 1)
+#endif
+        gtk_box_pack_start(GTK_BOX(vbox), table, FALSE, TRUE, 5);
+        for (i = 0; i < nrows; i++) {
+          GtkWidget *label = gtk_label_new(info_texts[i]);
+          entries[i] = gtk_entry_new();
+          if (i == nrows - 1)
+            gtk_entry_set_activates_default(GTK_ENTRY(entries[i]), TRUE);
+          if (type >= GTDIALOG_SECURE_INPUTBOX || no_show)
+            gtk_entry_set_visibility(GTK_ENTRY(entries[i]), FALSE);
+          if (i < len) gtk_entry_set_text(GTK_ENTRY(entries[i]), texts[i]);
+          attach(label, 0, 1, i, i + 1, FILL(SHRINK), FILL(SHRINK), 5, 0);
+          attach(entries[i], 1, 2, i, i + 1, FILL(EXPAND), FILL(SHRINK), 5, 0);
+        }
+      }
 #elif CURSES
       EDisplayType display = vMIXED;
       if (type >= GTDIALOG_SECURE_INPUTBOX || no_show) display = vHMIXED;
-      entry = newCDKEntry(dialog, LEFT, TOP, (char *)title, (char *)info_text,
-                          A_NORMAL, '_', display, 0, 0, 100, FALSE, FALSE);
-      bindCDKObject(vENTRY, entry, KEY_TAB, buttonbox_tab, buttonbox);
-      bindCDKObject(vENTRY, entry, KEY_BTAB, buttonbox_tab, buttonbox);
-      if (text) setCDKEntryValue(entry, (char *)text);
+      if (nrows < 2) {
+        // Single entry inputbox.
+        entry = newCDKEntry(dialog, LEFT, TOP, (char *)title, (char *)info_text,
+                            A_NORMAL, '_', display, 0, 0, 100, FALSE, FALSE);
+        bindCDKObject(vENTRY, entry, KEY_TAB, buttonbox_tab, buttonbox);
+        bindCDKObject(vENTRY, entry, KEY_BTAB, buttonbox_tab, buttonbox);
+        if (text) setCDKEntryValue(entry, (char *)text);
+      } else {
+        // Multiple entry inputbox.
+        for (i = 0; i < nrows; i++) {
+          entries[i] = newCDKEntry(dialog, LEFT, (i == 0) ? TOP : i + 3,
+                                   (i == 0) ? (char *)title : NULL,
+                                   (char *)info_texts[i], A_NORMAL, '_',
+                                   display, 0, 0, 100, FALSE, FALSE);
+          BINDFN function = (i < nrows - 1) ? entries_tab : buttonbox_tab;
+          void *data = (i < nrows - 1) ? entries : (void *)buttonbox;
+          bindCDKObject(vENTRY, entries[i], KEY_TAB, function, data);
+          bindCDKObject(vENTRY, entries[i], KEY_DOWN, function, data);
+          bindCDKObject(vENTRY, entries[i], KEY_BTAB, entries_tab, entries);
+          bindCDKObject(vENTRY, entries[i], KEY_UP, entries_tab, entries);
+          if (i < len) setCDKEntryValue(entries[i], (char *)texts[i]);
+        }
+        entries[nrows] = NULL;
+      }
 #endif
     } else if (type == GTDIALOG_TEXTBOX) {
 #if GTK
@@ -980,7 +1054,18 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     int response;
     if (type >= GTDIALOG_INPUTBOX &&
         type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
-      activateCDKEntry(entry, NULL);
+      if (nrows > 1) {
+        // Handle cycling through the multiple entries.
+        activateCDKEntry(focused_entry = entries[0], NULL);
+        while (focused_entry->exitType == vNORMAL ||
+               focused_entry->exitType == vNEVER_ACTIVATED) {
+          if (focused_entry->exitType == vNORMAL &&
+              focused_entry == entries[nrows - 1]) break; // ENTER in last entry
+          for (i = 0; i < nrows; i++) entries[i]->exitType = vNEVER_ACTIVATED;
+          activateCDKEntry(focused_entry, NULL);
+        }
+        entry = focused_entry;
+      } else activateCDKEntry(entry, NULL);
       response = (entry->exitType == vNORMAL) ? 1 + buttonbox->currentButton
                                               : RESPONSE_DELETE;
     } else if (type == GTDIALOG_TEXTBOX && focus_textbox) {
@@ -1021,10 +1106,34 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         int created = FALSE;
         if (type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
 #if GTK
-          txt = (char *)gtk_entry_get_text(GTK_ENTRY(entry));
+          if (nrows > 1) {
+            // Combine multiple entries into a '\n' separated string.
+            GString *gstr = g_string_new("");
+            for (i = 0; i < nrows; i++) {
+              g_string_append(gstr, gtk_entry_get_text(GTK_ENTRY(entries[i])));
+              g_string_append_c(gstr, '\n');
+            }
+            txt = copy(gstr->str), created = TRUE;
+            if (strlen(txt) > 0) txt[strlen(txt) - 1] = '\0'; // chomp '\n'
+            g_string_free(gstr, TRUE);
+          } else txt = (char *)gtk_entry_get_text(GTK_ENTRY(entry));
 #elif CURSES
-          txt = copy(getCDKEntryValue(entry)), created = TRUE;
-          destroyCDKEntry(entry);
+          if (nrows > 1) {
+            // Combine multiple entries into a '\n' separated string.
+            int len = 1;
+            for (i = 0; i < nrows; i++)
+              len += strlen(getCDKEntryValue(entries[i])) + 1;
+            txt = malloc(len), created = TRUE;
+            char *p = txt;
+            for (i = 0; i < nrows; i++) {
+              p = stpcpy(p, getCDKEntryValue(entries[i])), *p++ = '\n';
+              destroyCDKEntry(entries[i]);
+            }
+            if (p - txt > 0) *p = '\0'; // chomp '\n'
+          } else {
+            txt = copy(getCDKEntryValue(entry)), created = TRUE;
+            destroyCDKEntry(entry);
+          }
 #endif
         } else if (type == GTDIALOG_TEXTBOX && editable) {
 #if GTK
@@ -1185,6 +1294,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #define HELP_INPUTBOX \
 "gtdialog inputbox [args]\n" \
 "  A one line input box with custom button labels.\n" \
+"  An input box may have multiple entry boxes.\n" \
 "gtdialog standard-inputbox [args]\n" \
 "  Identical to inputbox, but with localized “Ok” and “Cancel” buttons.\n" \
 "gtdialog secure-inputbox [args]\n" \
@@ -1273,12 +1383,18 @@ HELP_DROPDOWN HELP_FILTEREDLIST \
 "  --timeout int\n" \
 "      The number of seconds the dialog waits for a button click before\n" \
 "      timing out. Dialogs do not time out by default.\n"
-#define HELP_INFORMATIVE_TEXT_MAIN \
-"  --informative-text str\n" \
-"      The main message text.\n"
-#define HELP_TEXT_INPUT \
-"  --text str\n" \
-"      The initial input text.\n"
+#define HELP_INFORMATIVE_TEXT_INPUTBOX \
+"  --informative-text str [labels]\n" \
+"      The main message text.\n" \
+"      Create multiple, labeled entry boxes by specifying one label for\n" \
+"      each box. Each label must be a separate argument. Providing a single\n" \
+"      label has no effect.\n"
+#define HELP_TEXT_INPUTBOX \
+"  --text str|list\n" \
+"      The initial input text.\n" \
+"      Fill multiple entry boxes in order using a list of input strings.\n" \
+"      Each string must be a separate argument. Use '' for blanks.\n" \
+"      Requires more than one label in --informative-text.\n"
 #define HELP_NO_SHOW \
 "  --no-show\n" \
 "      Mask the user input by showing typed characters as password\n" \
@@ -1381,6 +1497,12 @@ HELP_DROPDOWN HELP_FILTEREDLIST \
 "  --select int\n" \
 "      The zero-based index of the item in the list to select. The first\n" \
 "      item in the list is selected by default.\n"
+#define HELP_INFORMATIVE_TEXT_FILTEREDLIST \
+"  --informative-text str\n" \
+"      The main message text.\n"
+#define HELP_TEXT_FILTEREDLIST \
+"  --text str\n" \
+"      The initial input text.\n"
 #define HELP_COLUMNS \
 "  --columns list\n" \
 "      The column names for a list row. Each name must be a separate\n" \
@@ -1416,8 +1538,9 @@ HELP_DROPDOWN HELP_FILTEREDLIST \
 "all stock item labels (“gtk-ok”, “gtk-cancel”, “gtk-yes”, and “gtk-no”).\n"
 #define HELP_INPUTBOX_RETURN \
 "The input dialogs return a string containing the number of the button\n" \
-"pressed followed by a newline character (‘\\n’) and the input text, ‘0’ if\n" \
-"the dialog timed out, or “-1” if the user canceled the dialog. If\n" \
+"pressed followed by a newline character (‘\\n’) and the input text\n" \
+"(with any multiple entries separated by newline characters), ‘0’ if the\n" \
+"dialog timed out, or “-1” if the user canceled the dialog. If\n" \
 "--string-output was given, the return string contains the label of the\n" \
 "button pressed followed by a newline and the input text, “timeout” if the\n" \
 "dialog timed out, or “delete” if the user canceled the dialog.\n"
@@ -1519,8 +1642,8 @@ int help(int argc, char *argv[]) {
   case GTDIALOG_SECURE_INPUTBOX:
   case GTDIALOG_SECURE_STANDARD_INPUTBOX:
     puts(HELP(HELP_INPUTBOX,
-              HELP_INFORMATIVE_TEXT_MAIN
-              HELP_TEXT_INPUT
+              HELP_INFORMATIVE_TEXT_INPUTBOX
+              HELP_TEXT_INPUTBOX
               HELP_NO_SHOW
               HELP_BUTTON1_INPUTBOX
               HELP_BUTTON2_INPUTBOX
@@ -1589,8 +1712,8 @@ int help(int argc, char *argv[]) {
     break;
   case GTDIALOG_FILTEREDLIST:
     puts(HELP(HELP_FILTEREDLIST,
-              HELP_INFORMATIVE_TEXT_MAIN
-              HELP_TEXT_INPUT
+              HELP_INFORMATIVE_TEXT_FILTEREDLIST
+              HELP_TEXT_FILTEREDLIST
               HELP_COLUMNS
               HELP_ITEMS_FILTEREDLIST
               HELP_BUTTON1
