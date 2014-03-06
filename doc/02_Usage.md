@@ -105,6 +105,7 @@ canceled the dialog.
 
 =`gtdialog inputbox` *args*=
     A one line input box with custom button labels.
+    An input box may have multiple entry boxes.
 =`gtdialog standard-inputbox` *args*=
     Identical to inputbox, but with [localized](#Localization) “Ok” and “Cancel”
     buttons.
@@ -126,10 +127,16 @@ canceled the dialog.
     Manually set the width of the dialog in pixels if possible.
 =`--height int`=
     Manually set the height of the dialog in pixels if possible.
-=`--informative-text str`=
-    The main message text.
-=`--text str`=
-    The initial input text.
+=`--informative-text str [labels]`=
+      The main message text.
+      Create multiple, labeled entry boxes by specifying one label for
+      each box. Each label must be a separate argument. Providing a single
+      label has no effect.
+=`--text str|list`=
+      The initial input text.
+      Fill multiple entry boxes in order using a list of input strings.
+      Each string must be a separate argument. Use `''` for blanks.
+      Requires more than one label in `--informative-text`.
 =`--no-show`=
     Mask the user input by showing typed characters as password characters.
 =`--button1 str`=
@@ -148,12 +155,13 @@ canceled the dialog.
 
 **Returns**
 
-The input dialogs return a string containing the number of the button pressed
-followed by a newline character (‘\n’) and the input text, ‘0’ if the dialog
-timed out, or “-1” if the user canceled the dialog. If `--string-output` was
-given, the return string contains the label of the button pressed followed by a
-newline and the input text, “timeout” if the dialog timed out, or “delete” if
-the user canceled the dialog.
+The input dialogs return a string containing the number of the button
+pressed followed by a newline character (‘\n’) and the input text
+(with any multiple entries separated by newline characters), ‘0’ if the
+dialog timed out, or “-1” if the user canceled the dialog. If
+`--string-output` was given, the return string contains the label of the
+button pressed followed by a newline and the input text, “timeout” if the
+dialog timed out, or “delete” if the user canceled the dialog.
 
 **Example**
 
@@ -466,6 +474,68 @@ or “delete” if the user canceled the dialog.
 
     gtdialog filteredlist --title Title --columns Foo Bar \
       --items a b c d --no-newline
+
+- - -
+
+<div style="float:right;">
+  <img src="images/optionselect.png" alt="optionselect"/>
+</div>
+
+## Option Selection
+
+=`gtdialog optionselect` *args*=
+    A group of options to select from.
+
+**Arguments**
+
+=`--title str`=
+      The dialog's title text.
+=`--string-output`=
+      Output the names of selected buttons/items or exit codes instead of
+      button/item indexes or exit code numbers.
+=`--no-newline`=
+      Do not output the default trailing newline.
+=`--width int`=
+      Manually set the width of the dialog in pixels if possible.
+=`--height int`=
+      Manually set the height of the dialog in pixels if possible.
+=`--informative-text str`=
+      The main message text.
+=`--items list`=
+      The options to show in the option group. Each item must be a
+      separate argument.
+=`--select indices`=
+      The zero-based indices of the options in the option group to select.
+      Each index must be a separate argument.
+=`--button1 str`=
+      The right-most button's label.
+=`--button2 str`=
+      The middle button's label.
+=`--button3 str`=
+      The left-most button's label.
+      Requires --button2.
+=`--float`=
+      Show the dialog on top of all windows.
+=`--timeout int`=
+      The number of seconds the dialog waits for a button click before
+      timing out. Dialogs do not time out by default.
+
+**Returns**
+
+The optionselect dialog returns a string containing the number of the
+button pressed followed by a newline character (‘\n’) and the index of
+the selected options starting from 0, ‘0’ if the dialog timed out, or “-1”
+if the user canceled the dialog. If `--string-output` was given, the return
+string contains the label of the button pressed followed by a newline and
+the selected option(s), “timeout” if the dialog timed out, or “delete” if
+the user canceled the dialog.
+
+**Example**
+
+    gtdialog optionselect --title Languages \
+      --informative-text 'Check the languages you understand' \
+      --items English French German Romanian Russian Spanish Swedish \
+      --select 0 2 --string-output --no-newline
 
 ## Localization
 
