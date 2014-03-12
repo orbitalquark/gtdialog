@@ -231,7 +231,7 @@ static gboolean list_keypress(GtkWidget *treeview, GdkEventKey *event,
 /** Signal for a row being activated in the filteredlist view. */
 static gboolean list_select(GtkTreeView *treeview, GtkTreePath *path,
                             GtkTreeViewColumn *column, gpointer userdata) {
-  g_signal_emit_by_name(userdata, "response", 1);
+  return (g_signal_emit_by_name(userdata, "response", 1), TRUE);
 }
 
 /** Function for filtering filterdlist items based on user input. */
