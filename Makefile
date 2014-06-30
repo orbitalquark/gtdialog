@@ -50,9 +50,8 @@ uninstall:
 # Documentation.
 
 manual: doc/*.md *.md
-	doc/bombay -d doc -t doc --title gtDialog --navtitle Manual $^
-cleandoc:
-	rm -f doc/*.html
+	doc/bombay -d doc -t doc --title gtDialog $^
+cleandoc: ; rm -f doc/manual.html
 
 # Package.
 
