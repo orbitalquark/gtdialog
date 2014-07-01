@@ -51,8 +51,8 @@ Download gtDialog from the project's [download page][] or from this quick link:
 
 ## Installation and Usage
 
-gtDialog comes with a manual and API documentation in the *doc/* directory.
-They are also available [online][].
+gtDialog comes with a manual in the *doc/* directory. It is also available
+[online][].
 
 [online]: http://foicica.com/gtdialog
 
