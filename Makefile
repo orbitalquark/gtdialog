@@ -49,7 +49,7 @@ uninstall:
 
 # Documentation.
 
-manual: doc/*.md *.md
+manual: doc/*.md *.md | doc/bombay
 	doc/bombay -d doc -t doc --title gtDialog $^
 cleandoc: ; rm -f doc/manual.html
 
@@ -62,4 +62,14 @@ release: manual
 	hg archive $(basedir)
 	rm $(basedir)/.hg*
 	cp -rL doc $(basedir)
-	zip -r releases/$(basedir).zip $(basedir) && rm -r $(basedir)
+	zip -r /tmp/$(basedir).zip $(basedir) && rm -r $(basedir)
+
+# External dependencies.
+
+bombay_zip = bombay.zip
+
+$(bombay_zip):
+	wget "http://foicica.com/hg/bombay/archive/tip.zip" && mv tip.zip $@
+doc/bombay: | $(bombay_zip)
+	mkdir $(notdir $@) && unzip -d $(notdir $@) $| && \
+		mv $(notdir $@)/*/* $(dir $@)
