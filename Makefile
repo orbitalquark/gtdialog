@@ -49,6 +49,7 @@ uninstall:
 
 # Documentation.
 
+doc: manual
 manual: doc/*.md *.md | doc/bombay
 	doc/bombay -d doc -t doc --title gtDialog $^
 cleandoc: ; rm -f doc/manual.html
@@ -58,7 +59,7 @@ cleandoc: ; rm -f doc/manual.html
 basedir = gtdialog_$(shell grep '^\#\#' CHANGELOG.md | head -1 | \
                             cut -d ' ' -f 2)
 
-release: manual
+release: doc
 	hg archive $(basedir)
 	rm $(basedir)/.hg*
 	cp -rL doc $(basedir)
