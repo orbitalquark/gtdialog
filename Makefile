@@ -1,6 +1,7 @@
 # Copyright 2009-2014 Mitchell mitchell.att.foicica.com.
 
 CC = gcc
+CFLAGS = -Wall -Wno-unused-variable -Wno-unused-but-set-variable
 PREFIX ?= /usr/local
 
 bin_dir = $(DESTDIR)$(PREFIX)/bin

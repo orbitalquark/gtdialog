@@ -183,7 +183,7 @@ static gboolean read_stdin(GIOChannel *ch, GIOCondition cond, gpointer data) {
                                       0.01 * atoi(input));
       else
         gtk_progress_bar_pulse(GTK_PROGRESS_BAR(progressbar));
-      if (*(p + 1))
+      if (*(p + 1)) {
         if (stoppable) {
           box = gtk_dialog_get_action_area(GTK_DIALOG(dialog));
           GList *children2 = gtk_container_get_children(GTK_CONTAINER(box));
@@ -196,6 +196,7 @@ static gboolean read_stdin(GIOChannel *ch, GIOCondition cond, gpointer data) {
             gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), p + 1);
           g_list_free(children2);
         } else gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), p + 1);
+      }
       free(input);
       g_list_free(children);
     }
@@ -863,7 +864,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           fseek(f, 0, SEEK_END);
           int len = ftell(f);
           char *buf = malloc(len + 1);
-          rewind(f), fread(buf, 1, len, f), buf[len] = '\0';
+          rewind(f), buf[fread(buf, 1, len, f)] = '\0';
 #if GTK
           gtk_text_buffer_set_text(buffer, buf, len);
 #elif CURSES
@@ -1327,7 +1328,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if !_WIN32
     GIOChannel *ch = g_io_channel_unix_new(0);
 #else
-    GIOChannel *ch = g_io_channel_win32_new_fd(stdin);
+    GIOChannel *ch = g_io_channel_win32_new_fd(0); // TODO: test
 #endif
     g_io_channel_set_encoding(ch, NULL, NULL);
     int source = g_io_add_watch(ch, G_IO_IN | G_IO_HUP, read_stdin, dialog);
