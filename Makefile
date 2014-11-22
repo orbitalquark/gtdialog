@@ -1,11 +1,12 @@
 # Copyright 2009-2014 Mitchell mitchell.att.foicica.com.
 
 CC = gcc
-CFLAGS = -Wall -Wno-unused-variable -Wno-unused-but-set-variable
 PREFIX ?= /usr/local
 
 bin_dir = $(DESTDIR)$(PREFIX)/bin
 
+gtdialog_flags = -std=c99 -pedantic -Wall -Wno-unused-variable \
+                 -Wno-unused-but-set-variable
 ifeq (, $(findstring curses, $(MAKECMDGOALS)))
   ifndef GTK3
     gtk_version = 2.0
@@ -16,7 +17,7 @@ ifeq (, $(findstring curses, $(MAKECMDGOALS)))
   gtk_libs = $(shell pkg-config --libs gtk+-$(gtk_version))
   install_targets = gtdialog
 else
-  curses_flags = -DCURSES
+  curses_flags = -DCURSES -D_POSIX_C_SOURCE=200809L
   curses_libs = -lncursesw -lcdk
   install_targets = gtdialog-curses
 endif
@@ -30,23 +31,21 @@ endif
 all: gtdialog
 curses: gtdialog-curses
 gtdialog.o: gtdialog.c
-	$(CC) -c $(CFLAGS) $(gtk_flags) -o $@ $<
+	$(CC) -c $(CFLAGS) $(gtdialog_flags) $(gtk_flags) -o $@ $<
 gtdialog-curses.o: gtdialog.c
-	$(CC) -c $(CFLAGS) $(curses_flags) -o $@ $<
+	$(CC) -c $(CFLAGS) $(gtdialog_flags) $(curses_flags) -o $@ $<
 gtdialog: gtdialog.o
 	$(CC) $(CFLAGS) $(gtk_flags) -o $@ $< $(gtk_libs) $(LDFLAGS)
 gtdialog-curses: gtdialog-curses.o
 	$(CC) $(CFLAGS) $(curses_flags) -o $@ $< $(curses_libs) $(LDFLAGS)
-clean:
-	rm -f gtdialog gtdialog-curses *.o
+clean: ; rm -f gtdialog gtdialog-curses *.o
 
 # Install/Uninstall.
 
 install: $(install_targets)
 	install -d $(bin_dir)
 	install $^ $(bin_dir)
-uninstall:
-	rm $(bin_dir)/gtdialog*
+uninstall: ; rm $(bin_dir)/gtdialog*
 
 # Documentation.
 
@@ -58,7 +57,7 @@ cleandoc: ; rm -f doc/manual.html
 # Package.
 
 basedir = gtdialog_$(shell grep '^\#\#' CHANGELOG.md | head -1 | \
-                            cut -d ' ' -f 2)
+                           cut -d ' ' -f 2)
 
 release: doc
 	hg archive $(basedir)

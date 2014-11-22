@@ -700,7 +700,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   CDKSELECTION *options;
   CDKFSELECT *fileselect;
   char cwd[FILENAME_MAX];
-  getcwd(cwd, FILENAME_MAX);
+  if (getcwd(cwd, FILENAME_MAX)); // 'if' prevents compiler warning
 #endif
   if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE) {
 #if GTK
@@ -1320,7 +1320,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     char *txt = activateCDKFselect(fileselect, NULL);
     out = txt ? copy(txt) : copy("");
     destroyCDKFselect(fileselect);
-    chdir(cwd);
+    if (chdir(cwd)); // 'if' prevents compiler warning
 #endif
   } else if (type == GTDIALOG_PROGRESSBAR) {
 #if GTK
