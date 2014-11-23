@@ -1193,15 +1193,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
               len += strlen(getCDKEntryValue(entries[i])) + 1;
             txt = malloc(len), created = TRUE;
             char *p = txt;
-            for (i = 0; i < nrows; i++) {
+            for (i = 0; i < nrows; i++)
               p = stpcpy(p, getCDKEntryValue(entries[i])), *p++ = '\n';
-              destroyCDKEntry(entries[i]);
-            }
             if (p - txt > 0) *p = '\0'; // chomp '\n'
-          } else {
-            txt = copy(getCDKEntryValue(entry)), created = TRUE;
-            destroyCDKEntry(entry);
-          }
+          } else txt = copy(getCDKEntryValue(entry)), created = TRUE;
 #endif
         } else if (type == GTDIALOG_TEXTBOX && editable) {
 #if GTK
@@ -1217,7 +1212,6 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           }
 #elif CURSES
           txt = copy(getCDKMentryValue(textview)), created = TRUE;
-          destroyCDKMentry(textview);
 #endif
         } else if (type == GTDIALOG_DROPDOWN ||
                    type == GTDIALOG_STANDARD_DROPDOWN) {
@@ -1227,7 +1221,6 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #elif CURSES
             if (len > 0)
               txt = (char *)items[getCDKItemlistCurrentItem(combobox)];
-            destroyCDKItemlist(combobox);
 #endif
           } else {
             txt = malloc(4), created = TRUE;
@@ -1236,7 +1229,6 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                     gtk_combo_box_get_active(GTK_COMBO_BOX(combobox)));
 #elif CURSES
                     getCDKItemlistCurrentItem(combobox));
-            destroyCDKItemlist(combobox);
 #endif
           }
         } else if (type == GTDIALOG_FILTEREDLIST) {
@@ -1265,12 +1257,6 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                 txt = (char *)items[i * ncols + output_col - 1];
             } else txt = malloc(4), sprintf(txt, "%i", i), created = TRUE;
           }
-          destroyCDKEntry(entry), destroyCDKScroll(scrolled);
-          if (model.rows) {
-            for (i = -1; i < model.num_rows; i++) free(model.rows[i]);
-            free(&model.rows[-1]);
-          }
-          if (model.filtered_rows) free(model.filtered_rows);
 #endif
         } else if (type == GTDIALOG_OPTIONSELECT) {
 #if GTK
@@ -1369,6 +1355,24 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if GTK
   gtk_widget_destroy(dialog);
 #elif CURSES
+  if (type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
+    if (nrows < 2)
+      destroyCDKEntry(entry);
+    else
+      for (i = 0; i < nrows; i++) destroyCDKEntry(entries[i]);
+  } else if (type == GTDIALOG_TEXTBOX)
+    destroyCDKMentry(textview);
+  else if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN)
+    destroyCDKItemlist(combobox);
+  else if (type == GTDIALOG_FILTEREDLIST) {
+    destroyCDKEntry(entry), destroyCDKScroll(scrolled);
+    if (model.rows) {
+      for (i = -1; i < model.num_rows; i++) free(model.rows[i]);
+      free(&model.rows[-1]);
+    }
+    if (model.filtered_rows) free(model.filtered_rows);
+  } else if (type == GTDIALOG_OPTIONSELECT)
+    destroyCDKSelection(options);
   delwin(dialog->window), destroyCDKScreen(dialog);
   curs_set(cursor); // restore cursor
   timeout(0), getch(), timeout(-1); // flush input
