@@ -395,6 +395,27 @@ static int entry_keypress(EObjectType cdkType, void *object, void *data,
 #define stpcpy(d, s) (strcpy(d, s), d + strlen(s))
 #endif
 
+#if !HAVE_CDKUTF8
+/** Returns the number of bytes in the given UTF-8 character. */
+static unsigned int utf8charlen(unsigned char ch) {
+  if (ch < 0x80)
+    return 1;
+  else if (ch < 0x80 + 0x40 + 0x20)
+    return 2;
+  else if (ch < 0x80 + 0x40 + 0x20 + 0x10)
+    return 3;
+  else
+    return 4;
+}
+
+/** Returns the number of characters in the given UTF-8 string. */
+static size_t utf8strlen(const char *s) {
+  size_t len = strlen(s), utf8len = 0;
+  for (int i = 0; i < len; i += utf8charlen((unsigned char)(s[i]))) utf8len++;
+  return utf8len;
+}
+#endif
+
 /**
  * Creates and returns the set of display rows from the given list of columns,
  * number of columns, list of items, and number of items.
@@ -411,12 +432,12 @@ static char **item_rows(char **cols, int ncols, char **items, int len) {
   int *col_widths = malloc(sizeof(int) * ncols);
   int i, j, row_len = 0;
   for (i = 0; i < ncols; i++) {
-    int max = strlen(cols[i]);
+    int utf8max = utf8strlen(cols[i]), max = strlen(cols[i]);
     for (j = i; j < len; j += ncols) {
-      int slen = strlen(items[j]);
-      if (slen > max) max = slen;
+      int utf8len = utf8strlen(items[j]);
+      if (utf8len > utf8max) utf8max = utf8len, max = strlen(items[j]);
     }
-    col_widths[i] = max, row_len += col_widths[i] + 1;
+    col_widths[i] = utf8max, row_len += max + 1;
   }
   // Generate the display rows, padding row items to fit column widths and
   // separating columns with '|'s.
@@ -428,7 +449,7 @@ static char **item_rows(char **cols, int ncols, char **items, int len) {
     for (j = i; j < i + ncols && j < len; j++) {
       char *item = (i < 0) ? cols[j - i] : items[j];
       p = stpcpy(p, item);
-      int padding = col_widths[j - i] - strlen(item);
+      int padding = col_widths[j - i] - utf8strlen(item);
       while (padding-- > 0) *p++ = ' ';
       *p++ = (i < 0) ? '|' : ' ';
     }
@@ -1027,9 +1048,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if (LIBRARY && !_WIN32)
       tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
 #endif
-      fileselect = newCDKFselect(dialog, LEFT, TOP, 0, 0, (char *)title,
-                                 (char *)text, A_NORMAL, '_', A_REVERSE, "</B>",
-                                 "</N>", "</N>", "</N>", TRUE, FALSE);
+      fileselect = newCDKFselect(dialog, LEFT, TOP, height, width,
+                                 (char *)title, (char *)text, A_NORMAL, '_',
+                                 A_REVERSE, "</B>", "</N>", "</N>", "</N>",
+                                 TRUE, FALSE);
 #endif
     } else {
 #if GTK
@@ -1047,9 +1069,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if (LIBRARY && !_WIN32)
       tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
 #endif
-      fileselect = newCDKFselect(dialog, LEFT, TOP, 0, 0, (char *)title,
-                                 (char *)text, A_NORMAL, '_', A_REVERSE, "</B>",
-                                 "</N>", "</N>", "</N>", TRUE, FALSE);
+      fileselect = newCDKFselect(dialog, LEFT, TOP, height, width,
+                                 (char *)title, (char *)text, A_NORMAL, '_',
+                                 A_REVERSE, "</B>", "</N>", "</N>", "</N>",
+                                 TRUE, FALSE);
 #endif
     }
 #if GTK
