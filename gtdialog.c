@@ -1322,7 +1322,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       if (!locale || !*locale) locale = getenv("LANG");
       if (locale && (charset = strchr(locale, '.'))) charset++;
     }
-#elif (CURSES && WIN32)
+#elif (CURSES && _WIN32)
     char codepage[8];
     sprintf(codepage, "CP%d", GetACP()), charset = codepage;
 #endif
