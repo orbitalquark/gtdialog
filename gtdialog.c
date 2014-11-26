@@ -279,8 +279,8 @@ static gboolean timeout_dialog(gpointer userdata) {
  */
 static int wrap(char *str, int w, char ***plines) {
   // Wrap lines by replacing spaces with '\n' at the appropriate locations.
-  int i, len = strlen(str);
-  for (i = w; i < len; i += w) {
+  int len = strlen(str);
+  for (int i = w; i < len; i += w) {
     int j = i;
     while (j >= 0 && !isspace(str[j])) j--;
     if (j + w > i) i = j, str[i++] = '\n'; // line length < w; cut here
@@ -292,7 +292,7 @@ static int wrap(char *str, int w, char ***plines) {
   // Create the list of lines.
   char **lines = malloc(nlines * sizeof(char *));
   lines[0] = str;
-  for (i = 1; i < nlines; i++) {
+  for (int i = 1; i < nlines; i++) {
     p = strstr(lines[i - 1], "\n"), *p = '\0';
     lines[i] = p + 1;
   }
@@ -352,8 +352,8 @@ typedef struct {
  */
 static char *strdown(char *s) {
   char *lower = copy(s);
-  int i, len = strlen(s);
-  for (i = 0; i < len; i++) lower[i] = tolower(s[i]);
+  int len = strlen(s);
+  for (int i = 0; i < len; i++) lower[i] = tolower(s[i]);
   return lower;
 }
 
@@ -364,17 +364,16 @@ static int entry_keypress(EObjectType cdkType, void *object, void *data,
   char *entry_text = getCDKEntryValue((CDKENTRY *)object);
   if (strlen(entry_text) > 0) {
     char *text = strdown(entry_text), **tokens = CDKsplitString(text, ' ');
-    int i, j, row = 0;
-    for (i = 0; i < model->len; i += model->ncols) {
+    int row = 0;
+    for (int i = 0; i < model->len; i += model->ncols) {
       char *item = strdown(model->items[i + model->search_col - 1]), *p = item;
       int visible = TRUE;
-      j = 0;
-      while (tokens[j] != NULL) {
+      for (int j = 0; tokens[j]; j++) {
         if (!(p = strstr(p, tokens[j]))) {
           visible = FALSE;
           break;
         }
-        p += strlen(tokens[j++]);
+        p += strlen(tokens[j]);
       }
       if (visible) model->filtered_rows[row++] = model->rows[i / model->ncols];
       free(item);
@@ -429,11 +428,10 @@ static size_t utf8strlen(const char *s) {
  */
 static char **item_rows(char **cols, int ncols, char **items, int len) {
   // Compute the column sizes needed to fit all row items in.
-  int *col_widths = malloc(sizeof(int) * ncols);
-  int i, j, row_len = 0;
-  for (i = 0; i < ncols; i++) {
+  int *col_widths = malloc(sizeof(int) * ncols), row_len = 0;
+  for (int i = 0; i < ncols; i++) {
     int utf8max = utf8strlen(cols[i]), max = strlen(cols[i]);
-    for (j = i; j < len; j += ncols) {
+    for (int j = i; j < len; j += ncols) {
       int utf8len = utf8strlen(items[j]);
       if (utf8len > utf8max) utf8max = utf8len, max = strlen(items[j]);
     }
@@ -443,10 +441,10 @@ static char **item_rows(char **cols, int ncols, char **items, int len) {
   // separating columns with '|'s.
   // The column headers are a special case and need to be underlined too.
   char **new_items = malloc(sizeof(char *) * ((len + ncols - 1) / ncols + 1));
-  for (i = -ncols; i < len; i += ncols) {
+  for (int i = -ncols; i < len; i += ncols) {
     char *new_item = malloc((i < 0) ? row_len + 4 : row_len);
     char *p = (i < 0) ? stpcpy(new_item, "</U>") : new_item;
-    for (j = i; j < i + ncols && j < len; j++) {
+    for (int j = i; j < i + ncols && j < len; j++) {
       char *item = (i < 0) ? cols[j - i] : items[j];
       p = stpcpy(p, item);
       int padding = col_widths[j - i] - utf8strlen(item);
@@ -1245,8 +1243,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
             i = getCDKScrollCurrentItem(scrolled);
             if (strlen(getCDKEntryValue(entry)) > 0) {
               char *item = model.filtered_rows[i];
-              int j;
-              for (j = 0; j < model.num_rows; j++)
+              for (int j = 0; j < model.num_rows; j++)
                 if (strcmp(item, model.rows[j]) == 0) {
                   i = j; // non-filtered index of selected item
                   break;
