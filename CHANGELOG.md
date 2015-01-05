@@ -4,6 +4,22 @@
 
 [Atom Feed]: feed
 
+## 1.2 (05 Jan 2015)
+
+Download:
+
+* [gtDialog 1.2][]
+
+Bugfixes:
+
+* Fixed curses memory leaks when cancelling a dialog.
+
+Changes:
+
+* None.
+
+[gtDialog 1.2]: download/gtdialog_1.2.zip
+
 ## 1.1 (08 Jul 2014)
 
 Download:
