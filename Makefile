@@ -64,6 +64,7 @@ release: doc
 	rm $(basedir)/.hg*
 	cp -rL doc $(basedir)
 	zip -r /tmp/$(basedir).zip $(basedir) && rm -r $(basedir)
+	gpg -ab /tmp/$(basedir).zip
 
 # External dependencies.
 

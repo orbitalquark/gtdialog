@@ -1,14 +1,15 @@
 # Changelog
 
-[Atom Feed][]
+[Atom Feed][] | [PGP Public Key][]
 
 [Atom Feed]: feed
+[PGP Public Key]: https://foicica.com/foicica.pgp
 
 ## 1.2 (05 Jan 2015)
 
 Download:
 
-* [gtDialog 1.2][]
+* [gtDialog 1.2][] | [PGP -- 1.2][]
 
 Bugfixes:
 
@@ -19,12 +20,13 @@ Changes:
 * None.
 
 [gtDialog 1.2]: download/gtdialog_1.2.zip
+[PGP -- 1.2]: download/gtdialog_1.2.zip.asc
 
 ## 1.1 (08 Jul 2014)
 
 Download:
 
-* [gtDialog 1.1][]
+* [gtDialog 1.1][] | [PGP -- 1.1][]
 
 Bugfixes:
 
@@ -38,6 +40,7 @@ Changes:
 * New [optionselect][] dialog for checkbox option groups.
 
 [gtDialog 1.1]: download/gtdialog_1.1.zip
+[PGP -- 1.1]: download/gtdialog_1.1.zip.asc
 [Inputboxes]: manual.html#Inputboxes
 [optionselect]: manual.html#Option.Selection
 
@@ -45,8 +48,9 @@ Changes:
 
 Download:
 
-* [gtDialog 1.0][]
+* [gtDialog 1.0][] | [PGP -- 1.0][]
 
 Initial release.
 
 [gtDialog 1.0]: download/gtdialog_1.0.zip
+[PGP -- 1.0]: download/gtdialog_1.0.zip.asc
