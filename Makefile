@@ -1,4 +1,4 @@
-# Copyright 2009-2015 Mitchell mitchell.att.foicica.com.
+# Copyright 2009-2016 Mitchell mitchell.att.foicica.com.
 
 CC = gcc
 PREFIX ?= /usr/local
