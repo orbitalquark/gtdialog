@@ -38,7 +38,6 @@
 #elif _WIN32
 #include <windows.h>
 #endif
-#include <iconv.h>
 #include <cdk.h>
 #endif
 
@@ -1311,18 +1310,6 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       } else out = copy(gtk_file_chooser_get_filename(chooser));
     } else out = copy("");
 #elif CURSES
-    const char *charset = NULL;
-#if (CURSES && !_WIN32)
-    charset = getenv("CHARSET");
-    if (!charset || !*charset) {
-      char *locale = getenv("LC_ALL");
-      if (!locale || !*locale) locale = getenv("LANG");
-      if (locale && (charset = strchr(locale, '.'))) charset++;
-    }
-#elif (CURSES && _WIN32)
-    char codepage[8];
-    sprintf(codepage, "CP%d", GetACP()), charset = codepage;
-#endif
     char *txt = activateCDKFselect(fileselect, NULL);
     out = txt ? copy(txt) : copy("");
     destroyCDKFselect(fileselect);
