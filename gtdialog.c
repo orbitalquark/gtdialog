@@ -1878,7 +1878,7 @@ int help(int argc, char *argv[]) {
 int main(int argc, char *argv[]) {
   if (argc == 1 || strcmp(argv[1], "help") == 0) return help(argc, argv);
   int type = gtdialog_type(argv[1]);
-  if (type < 0) return help(argc, argv);
+  if (type == GTDIALOG_UNKNOWN) return help(argc, argv);
 #if GTK
   gtk_init(&argc, &argv);
 #elif CURSES
