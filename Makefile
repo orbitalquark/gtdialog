@@ -5,8 +5,7 @@ PREFIX ?= /usr/local
 
 bin_dir = $(DESTDIR)$(PREFIX)/bin
 
-gtdialog_flags = -std=c99 -pedantic -Wall -Wno-unused-variable \
-                 -Wno-unused-but-set-variable
+gtdialog_flags = -std=c99 -pedantic -W -Wall -Wno-unused
 ifeq (, $(findstring curses, $(MAKECMDGOALS)))
   ifndef GTK3
     gtk_version = 2.0

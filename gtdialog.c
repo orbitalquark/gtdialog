@@ -109,7 +109,7 @@ void gtdialog_set_parent(GtkWindow *window) {
  *   "secure-inputbox", "secure-standard-inputbox", "fileselect", "filesave",
  *   "textbox", "progressbar", "dropdown", "standard-dropdown", and
  *   "filteredlist".
- * @return GTDialogType or -1
+ * @return GTDialogType or GTDIALOG_UNKNOWN
  */
 GTDialogType gtdialog_type(const char *type) {
   if (strcmp(type, "msgbox") == 0)
@@ -142,7 +142,7 @@ GTDialogType gtdialog_type(const char *type) {
     return GTDIALOG_FILTEREDLIST;
   else if (strcmp(type, "optionselect") == 0)
     return GTDIALOG_OPTIONSELECT;
-  return -1;
+  return GTDIALOG_UNKNOWN;
 }
 
 // Callbacks and utility functions.
@@ -409,7 +409,8 @@ static unsigned int utf8charlen(unsigned char ch) {
 /** Returns the number of characters in the given UTF-8 string. */
 static size_t utf8strlen(const char *s) {
   size_t len = strlen(s), utf8len = 0;
-  for (int i = 0; i < len; i += utf8charlen((unsigned char)(s[i]))) utf8len++;
+  for (size_t i = 0; i < len; i += utf8charlen((unsigned char)(s[i])))
+    utf8len++;
   return utf8len;
 }
 #endif
@@ -714,11 +715,13 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   CDKITEMLIST *combobox;
   CDKBUTTONBOX *buttonbox;
   CDKSCROLL *scrolled;
-  Model model = {ncols, search_col, (char **)items, len, NULL, 0, NULL, NULL};
+  Model model = {
+    ncols, search_col, (char **)items, len, NULL, 0, NULL, NULL, NULL
+  };
   CDKSELECTION *options;
   CDKFSELECT *fileselect;
   char cwd[FILENAME_MAX];
-  if (getcwd(cwd, FILENAME_MAX)); // 'if' prevents compiler warning
+  getcwd(cwd, FILENAME_MAX);
 #endif
   if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE) {
 #if GTK
@@ -1313,7 +1316,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     char *txt = activateCDKFselect(fileselect, NULL);
     out = txt ? copy(txt) : copy("");
     destroyCDKFselect(fileselect);
-    if (chdir(cwd)); // 'if' prevents compiler warning
+    chdir(cwd);
 #endif
   } else if (type == GTDIALOG_PROGRESSBAR) {
 #if GTK
@@ -1733,7 +1736,7 @@ type "\nArguments:\n" HELP_DEFAULT_ARGS args "\n" returns "\nExample:\n" example
  */
 int help(int argc, char *argv[]) {
 #ifndef NOHELP
-  switch ((argc == 3) ? gtdialog_type(argv[2]) : -1) {
+  switch ((argc == 3) ? gtdialog_type(argv[2]) : GTDIALOG_UNKNOWN) {
   case GTDIALOG_MSGBOX:
   case GTDIALOG_OK_MSGBOX:
   case GTDIALOG_YESNO_MSGBOX:
