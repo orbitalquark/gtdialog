@@ -592,7 +592,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       if (type < GTDIALOG_FILESELECT || type == GTDIALOG_TEXTBOX ||
           type == GTDIALOG_FILTEREDLIST || type == GTDIALOG_OPTIONSELECT) {
         info_text = args[i++];
-        if (type >= GTDIALOG_INPUTBOX ||
+        if (type >= GTDIALOG_INPUTBOX &&
             type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
           info_texts = &args[i], nrows = 0; // for multiple inputboxes, if any
           while (i < narg && strncmp(args[i], "--", 2) != 0) nrows++, i++;
