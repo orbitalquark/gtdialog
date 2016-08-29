@@ -5,6 +5,24 @@
 [Atom Feed]: feed
 [PGP Public Key]: https://foicica.com/foicica.pgp
 
+## 1.3 (29 Aug 2016)
+
+Download:
+
+* [gtDialog 1.3][] | [PGP -- 1.3][]
+
+Bugfixes:
+
+* Fixed button order in curses-based dialogs to match graphical dialogs.
+* Ignore multiple labels for non-inputbox dialogs.
+
+Changes:
+
+* None.
+
+[gtDialog 1.3]: download/gtdialog_1.3.zip
+[PGP -- 1.3]: download/gtdialog_1.3.zip.asc
+
 ## 1.2 (05 Jan 2015)
 
 Download:
