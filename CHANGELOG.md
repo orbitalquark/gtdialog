@@ -18,7 +18,9 @@ Bugfixes:
 
 Changes:
 
-* None.
+* The C library's `gtdialog_type()` function now returns `GTDIALOG_UNKNOWN`
+  instead of `-1` for an unrecognized dialog type string; `GTDialogType`
+  enumerations have changed internally.
 
 [gtDialog 1.3]: download/gtdialog_1.3.zip
 [PGP -- 1.3]: download/gtdialog_1.3.zip.asc
