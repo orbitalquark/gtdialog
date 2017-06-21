@@ -697,10 +697,10 @@ the user canceled the dialog.
 =`--height int`=
     Manually set the height of the dialog in pixels if possible.
 =`--color`=
-    The initially selected color in `"#RRGGBB"` format.
+    The initially selected color in “#RRGGBB” format.
 =`--palette [list]`=
     The colors to show in the dialog's color palette. Up to 20 colors can be
-    specified in `"#RRGGBB"` format. If no list is given, a default palette is
+    specified in “#RRGGBB” format. If no list is given, a default palette is
     shown.
 =`--float`=
     Show the dialog on top of all windows.
@@ -708,11 +708,56 @@ the user canceled the dialog.
 **Returns**
 
 The colorselect dialog returns a string containing the color selected in
-`"#RRGGBB"` format, or the empty string if the user cancelled the dialog.
+“#RRGGBB” format, or the empty string if the user cancelled the dialog.
 
 **Example**
 
     gtdialog colorselect --title Foreground --color "#FF0000" --no-newline
+
+- - -
+
+<div style="float:right;">
+  <img src="images/fontselect.png" alt="fontselect"/>
+</div>
+
+## Font Selection (GTK Only)
+
+=`gtdialog fontselect` *args*=
+    A font selection dialog.
+
+**Arguments**
+
+=`--title str`=
+    The dialog's title text.
+=`--string-output`=
+    Output the names of selected buttons/items or exit codes instead of
+    button/item indexes or exit code numbers.
+=`--no-newline`=
+    Do not output the default trailing newline.
+=`--width int`=
+    Manually set the width of the dialog in pixels if possible.
+=`--height int`=
+    Manually set the height of the dialog in pixels if possible.
+=`--text str`=
+    The font preview text.
+=`--font-name str`=
+    The initially selected font name.
+=`--font-size int`=
+    The initially selected font size. The default size is 12.
+=`--font-style str`=
+    The initially selected font style. The available options are “regular”,
+    “bold”, “italic”, and “bold italic”. The default style is “regular”.
+=`--float`=
+    Show the dialog on top of all windows.
+
+**Returns**
+
+The fontselect dialog returns a string containing the font selected (including
+style and size), or the empty string if the user cancelled the dialog.
+
+**Example**
+
+    gtdialog fontselect --title Font --font-name Monospace --font-size 10
 
 ## Localization
 

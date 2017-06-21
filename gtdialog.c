@@ -108,8 +108,8 @@ void gtdialog_set_parent(GtkWindow *window) {
  * @param type The string dialog type. Acceptable types are "msgbox",
  *   "ok-msgbox", "yesno-msgbox", "inputbox", "standard-inputbox",
  *   "secure-inputbox", "secure-standard-inputbox", "fileselect", "filesave",
- *   "textbox", "progressbar", "dropdown", "standard-dropdown", and
- *   "filteredlist".
+ *   "textbox", "progressbar", "dropdown", "standard-dropdown", "filteredlist",
+ *   "optionselect", "colorselect", and "fontselect".
  * @return GTDialogType or GTDIALOG_UNKNOWN
  */
 GTDialogType gtdialog_type(const char *type) {
@@ -145,6 +145,8 @@ GTDialogType gtdialog_type(const char *type) {
     return GTDIALOG_OPTIONSELECT;
   else if (strcmp(type, "colorselect") == 0)
     return GTDIALOG_COLORSELECT;
+  else if (strcmp(type, "fontselect") == 0)
+    return GTDIALOG_FONTSELECT;
   return GTDIALOG_UNKNOWN;
 }
 
@@ -488,17 +490,18 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 
   // Dialog options.
   int editable = FALSE, exit_onchange = FALSE, floating = FALSE,
-      focus_textbox = FALSE, height = -1, no_create_dirs = FALSE,
-      no_newline = FALSE, no_show = FALSE, percent = 0, select_multiple = FALSE,
-      select_only_dirs = FALSE, select = 0, selected = FALSE, timeout_len = 0,
-      width = -1;
+      focus_textbox = FALSE, font_size = 12, height = -1,
+      no_create_dirs = FALSE, no_newline = FALSE, no_show = FALSE, percent = 0,
+      select_multiple = FALSE, select_only_dirs = FALSE, select = 0,
+      selected = FALSE, timeout_len = 0, width = -1;
   indeterminate = FALSE, stoppable = FALSE, string_output = FALSE;
   output_col = 1, search_col = 1;
   const char *buttons[3] = {NULL, NULL, NULL}, **cols = NULL, *color = NULL,
-             *icon = NULL, *icon_file = NULL, *info_text = NULL,
-             **info_texts = NULL, **items = NULL, *scroll_to = "top",
-             **selects = NULL, *text = NULL, **texts = NULL, *text_file = NULL,
-             *title = "gtdialog", *with_dir = NULL, *with_file = NULL;
+             *font_name = NULL, *font_style = "", *icon = NULL,
+             *icon_file = NULL, *info_text = NULL, **info_texts = NULL,
+             **items = NULL, *scroll_to = "top", **selects = NULL, *text = NULL,
+             **texts = NULL, *text_file = NULL, *title = "gtdialog",
+             *with_dir = NULL, *with_file = NULL;
   // Other variables.
   int ncols = 0, nrows = 0, len = 0;
 #if GTK
@@ -583,6 +586,15 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           type != GTDIALOG_PROGRESSBAR) floating = TRUE;
     } else if (strcmp(arg, "--focus-textbox") == 0) {
       if (type == GTDIALOG_TEXTBOX) focus_textbox = TRUE;
+    } else if (strcmp(arg, "--font-name") == 0) {
+      if (type == GTDIALOG_FONTSELECT) font_name = args[i++];
+    } else if (strcmp(arg, "--font-size") == 0) {
+      if (type == GTDIALOG_FONTSELECT) {
+        int size = atoi(args[i++]);
+        if (size > 0) font_size = size;
+      }
+    } else if (strcmp(arg, "--font-style") == 0) {
+      if (type == GTDIALOG_FONTSELECT) font_style = args[i++];
     } else if (strcmp(arg, "--height") == 0) {
       int h = atoi(args[i++]);
       if (h > 0) height = h;
@@ -735,7 +747,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   getcwd(cwd, FILENAME_MAX);
 #endif
   if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
-      type != GTDIALOG_COLORSELECT) {
+      type != GTDIALOG_COLORSELECT && type != GTDIALOG_FONTSELECT) {
 #if GTK
     dialog = gtk_dialog_new();
     gtk_window_set_title(GTK_WINDOW(dialog), title);
@@ -1151,6 +1163,27 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
     // TODO:
 #endif
+  } else if (type == GTDIALOG_FONTSELECT) {
+#if GTK
+    dialog = gtk_font_selection_dialog_new(title);
+    if (parent) gtk_window_set_transient_for(GTK_WINDOW(dialog), parent);
+    if (floating) gtk_window_set_keep_above(GTK_WINDOW(dialog), TRUE);
+    GtkFontSelectionDialog *dlg = GTK_FONT_SELECTION_DIALOG(dialog);
+    if (font_name) {
+      GString *gstr = g_string_new(font_name);
+      g_string_append_printf(gstr, " %s %i", font_style, font_size);
+      gtk_font_selection_dialog_set_font_name(dlg, gstr->str);
+      g_string_free(gstr, TRUE);
+    }
+    if (text) gtk_font_selection_dialog_set_preview_text(dlg, text);
+#elif CURSES
+    // There will be a border drawn later, but account for it now.
+    dialog = initCDKScreen(newwin(height - 2, width - 2, 2, 2));
+#if (LIBRARY && !_WIN32)
+    tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
+#endif
+    // TODO:
+#endif
   }
 #if GTK
   gtk_window_set_wmclass(GTK_WINDOW(dialog), "gtdialog", "gtdialog");
@@ -1159,7 +1192,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   // Run dialog, storing output in 'out'.
   char *out = NULL;
   if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
-      type != GTDIALOG_PROGRESSBAR && type != GTDIALOG_COLORSELECT) {
+      type != GTDIALOG_PROGRESSBAR && type != GTDIALOG_COLORSELECT &&
+      type != GTDIALOG_FONTSELECT) {
 #if GTK
     gtk_widget_show_all(dialog);
     if (timeout_len)
@@ -1414,6 +1448,16 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     // TODO:
     out = copy("");
 #endif
+  } else if (type == GTDIALOG_FONTSELECT) {
+#if GTK
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK) {
+      GtkFontSelectionDialog *dlg = GTK_FONT_SELECTION_DIALOG(dialog);
+      out = copy(gtk_font_selection_dialog_get_font_name(dlg));
+    } else out = copy("");
+#elif CURSES
+    // TODO:
+    out = copy("");
+#endif
   }
   if (strcmp(out, "0") == 0 && string_output)
     out = copy("timeout");
@@ -1498,11 +1542,15 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #define HELP_COLORSELECT \
 "gtdialog colorselect [args]\n" \
 "  A color selection dialog.\n"
+#define HELP_FONTSELECT \
+"gtdialog fontselect [args]\n" \
+"  A font selection dialog.\n"
 #define HELP_ALL \
 "Usage: gtdialog type [args]\n" \
 "\n" \
 HELP_MSGBOX HELP_INPUTBOX HELP_FILE HELP_TEXTBOX HELP_PROGRESSBAR \
 HELP_DROPDOWN HELP_FILTEREDLIST HELP_OPTIONSELECT HELP_COLORSELECT \
+HELP_FONTSELECT \
 "\n" \
 "gtdialog help type\n" \
 "   Shows detailed documentation on gtdialog type\n"
@@ -1718,6 +1766,20 @@ HELP_DROPDOWN HELP_FILTEREDLIST HELP_OPTIONSELECT HELP_COLORSELECT \
 "      The colors to show in the dialog's color palette. Up to 20 colors \n" \
 "      can be specified in “#RRGGBB” format. If no list is given, a default\n" \
 "      palette is shown.\n"
+#define HELP_TEXT_FONTSELECT \
+"  --text str\n" \
+"      The font preview text.\n"
+#define HELP_FONT_NAME_FONTSELECT \
+"  --font-name str\n" \
+"      The initially selected font name.\n"
+#define HELP_FONT_SIZE_FONTSELECT \
+"  --font-size int\n" \
+"      The initially selected font size. The default size is 12.\n"
+#define HELP_FONT_STYLE_FONTSELECT \
+"  --font-style str\n" \
+"      The initially selected font style. The available options are\n" \
+"      “regular”, “bold”, “italic”, and “bold italic”. The default style\n " \
+"      is “regular”.\n"
 
 // Help on dialog returns.
 #define HELP_MSGBOX_RETURN \
@@ -1787,7 +1849,11 @@ HELP_DROPDOWN HELP_FILTEREDLIST HELP_OPTIONSELECT HELP_COLORSELECT \
 "the user canceled the dialog.\n"
 #define HELP_COLORSELECT_RETURN \
 "The colorselect dialog returns a string containing the color selected in\n" \
-"\"#RRGGBB\" format, or the empty string if the user cancelled the dialog.\n"
+"“#RRGGBB” format, or the empty string if the user cancelled the dialog.\n"
+#define HELP_FONTSELECT_RETURN \
+"The fontselect dialog returns a string containing the font selected\n" \
+"(including style and size), or the empty string if the user cancelled the \n" \
+"dialog.\n"
 
 // Help with dialog examples.
 #define HELP_MSGBOX_EXAMPLE \
@@ -1820,6 +1886,8 @@ HELP_DROPDOWN HELP_FILTEREDLIST HELP_OPTIONSELECT HELP_COLORSELECT \
 "    --select 0 2 --string-output --no-newline\n"
 #define HELP_COLORSELECT_EXAMPLE \
 "  gtdialog colorselect --title Foreground --color \"#FF0000\" --no-newline\n"
+#define HELP_FONTSELECT_EXAMPLE \
+"  gtdialog fontselect --title Font --font-name Monospace --font-size 10\n"
 
 // Help template.
 #define HELP(type, args, returns, example) \
@@ -1960,6 +2028,16 @@ int help(int argc, char *argv[]) {
               HELP_FLOAT,
               HELP_COLORSELECT_RETURN,
               HELP_COLORSELECT_EXAMPLE));
+    break;
+  case GTDIALOG_FONTSELECT:
+    puts(HELP(HELP_FONTSELECT,
+              HELP_TEXT_FONTSELECT
+              HELP_FONT_NAME_FONTSELECT
+              HELP_FONT_SIZE_FONTSELECT
+              HELP_FONT_STYLE_FONTSELECT
+              HELP_FLOAT,
+              HELP_FONTSELECT_RETURN,
+              HELP_FONTSELECT_EXAMPLE));
     break;
   default:
     puts(HELP_ALL);
