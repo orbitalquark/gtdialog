@@ -31,6 +31,7 @@
 #include <string.h>
 #if GTK
 #include <gtk/gtk.h>
+#include <gdk/gdk.h>
 #elif CURSES
 #include <unistd.h>
 #if (LIBRARY && !_WIN32)
@@ -142,6 +143,8 @@ GTDialogType gtdialog_type(const char *type) {
     return GTDIALOG_FILTEREDLIST;
   else if (strcmp(type, "optionselect") == 0)
     return GTDIALOG_OPTIONSELECT;
+  else if (strcmp(type, "colorselect") == 0)
+    return GTDIALOG_COLORSELECT;
   return GTDIALOG_UNKNOWN;
 }
 
@@ -491,16 +494,17 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       width = -1;
   indeterminate = FALSE, stoppable = FALSE, string_output = FALSE;
   output_col = 1, search_col = 1;
-  const char *buttons[3] = {NULL, NULL, NULL}, **cols = NULL, *icon = NULL,
-             *icon_file = NULL, *info_text = NULL, **info_texts = NULL,
-             **items = NULL, *scroll_to = "top", **selects = NULL, *text = NULL,
-             **texts = NULL, *text_file = NULL, *title = "gtdialog",
-             *with_dir = NULL, *with_file = NULL;
+  const char *buttons[3] = {NULL, NULL, NULL}, **cols = NULL, *color = NULL,
+             *icon = NULL, *icon_file = NULL, *info_text = NULL,
+             **info_texts = NULL, **items = NULL, *scroll_to = "top",
+             **selects = NULL, *text = NULL, **texts = NULL, *text_file = NULL,
+             *title = "gtdialog", *with_dir = NULL, *with_file = NULL;
   // Other variables.
   int ncols = 0, nrows = 0, len = 0;
 #if GTK
   PangoFontDescription *font = NULL;
   GtkFileFilter *filter = NULL;
+  char *default_palette = NULL;
 #endif
 
   // Dialog defaults.
@@ -562,6 +566,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           type == GTDIALOG_TEXTBOX || type == GTDIALOG_DROPDOWN ||
           type == GTDIALOG_FILTEREDLIST || type == GTDIALOG_OPTIONSELECT)
         buttons[2] = args[i++];
+    } else if (strcmp(arg, "--color") == 0) {
+      if (type == GTDIALOG_COLORSELECT) color = args[i++];
     } else if (strcmp(arg, "--columns") == 0) {
       if (type == GTDIALOG_FILTEREDLIST) {
         cols = &args[i], ncols = 0;
@@ -626,6 +632,11 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       if (type == GTDIALOG_FILTEREDLIST) {
         output_col = atoi(args[i++]);
         if (output_col < 1) output_col = 1;
+      }
+    } else if (strcmp(arg, "--palette") == 0) {
+      if (type == GTDIALOG_COLORSELECT) {
+        cols = &args[i], ncols = 0;
+        while (i < narg && strncmp(args[i], "--", 2) != 0) ncols++, i++;
       }
     } else if (strcmp(arg, "--percent") == 0) {
       if (type == GTDIALOG_PROGRESSBAR) percent = atoi(args[i++]);
@@ -723,7 +734,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   char cwd[FILENAME_MAX];
   getcwd(cwd, FILENAME_MAX);
 #endif
-  if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE) {
+  if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
+      type != GTDIALOG_COLORSELECT) {
 #if GTK
     dialog = gtk_dialog_new();
     gtk_window_set_title(GTK_WINDOW(dialog), title);
@@ -925,6 +937,12 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         gtk_progress_bar_pulse(GTK_PROGRESS_BAR(progressbar));
       if (text) gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), text);
 #elif CURSES
+      // There will be a border drawn later, but account for it now.
+      dialog = initCDKScreen(newwin(height - 2, width - 2, 2, 2));
+#if (LIBRARY && !_WIN32)
+      tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
+#endif
+      // TODO:
 #endif
     } else if (type == GTDIALOG_DROPDOWN ||
                type == GTDIALOG_STANDARD_DROPDOWN) {
@@ -1035,7 +1053,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
       }
     }
-  } else {
+  } else if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE) {
     if (type == GTDIALOG_FILESELECT) {
 #if GTK
       dialog = gtk_file_chooser_dialog_new(title, parent,
@@ -1099,6 +1117,40 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       free(dir);
     }
 #endif
+  } else if (type == GTDIALOG_COLORSELECT) {
+#if GTK
+    dialog = gtk_color_selection_dialog_new(title);
+    if (parent) gtk_window_set_transient_for(GTK_WINDOW(dialog), parent);
+    if (floating) gtk_window_set_keep_above(GTK_WINDOW(dialog), TRUE);
+    GtkColorSelectionDialog *dlg = GTK_COLOR_SELECTION_DIALOG(dialog);
+    GtkWidget *sel = gtk_color_selection_dialog_get_color_selection(dlg);
+    GdkColor gdk_color;
+    if (gdk_color_parse(color, &gdk_color))
+      gtk_color_selection_set_current_color(GTK_COLOR_SELECTION(sel),
+                                            &gdk_color);
+    if (ncols > 0) {
+      g_object_get(gtk_settings_get_default(), "gtk-color-palette",
+                   &default_palette, NULL); // save for later restoration
+      GString *gstr = g_string_new("");
+      for (i = 0; i < ncols && i < 20; i++)
+        g_string_append_printf(gstr, "%s:", cols[i]);
+      for (i = ncols; i < 20; i++) g_string_append(gstr, "#FFF:"); // fill
+      g_string_truncate(gstr, gstr->len - 1); // chop trailing ':'
+      gtk_settings_set_string_property(gtk_settings_get_default(),
+                                       "gtk-color-palette", gstr->str,
+                                       "XProperty");
+      g_string_free(gstr, TRUE);
+    }
+    if (cols)
+      gtk_color_selection_set_has_palette(GTK_COLOR_SELECTION(sel), TRUE);
+#elif CURSES
+    // There will be a border drawn later, but account for it now.
+    dialog = initCDKScreen(newwin(height - 2, width - 2, 2, 2));
+#if (LIBRARY && !_WIN32)
+    tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
+#endif
+    // TODO:
+#endif
   }
 #if GTK
   gtk_window_set_wmclass(GTK_WINDOW(dialog), "gtdialog", "gtdialog");
@@ -1107,7 +1159,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   // Run dialog, storing output in 'out'.
   char *out = NULL;
   if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
-      type != GTDIALOG_PROGRESSBAR) {
+      type != GTDIALOG_PROGRESSBAR && type != GTDIALOG_COLORSELECT) {
 #if GTK
     gtk_widget_show_all(dialog);
     if (timeout_len)
@@ -1338,6 +1390,29 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     else
       out = copy("stopped");
     g_source_remove(source), g_io_channel_unref(ch), g_io_channel_unref(ch);
+#elif CURSES
+    // TODO:
+    out = copy("");
+#endif
+  } else if (type == GTDIALOG_COLORSELECT) {
+#if GTK
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK) {
+      GtkColorSelectionDialog *dlg = GTK_COLOR_SELECTION_DIALOG(dialog);
+      GtkWidget *sel = gtk_color_selection_dialog_get_color_selection(dlg);
+      GdkColor gdk_color;
+      gtk_color_selection_get_current_color(GTK_COLOR_SELECTION(sel),
+                                            &gdk_color);
+      out = malloc(8);
+      sprintf(out, "#%02X%02X%02X", gdk_color.red / 256, gdk_color.green / 256,
+              gdk_color.blue / 256);
+    } else out = copy("");
+    if (default_palette)
+      gtk_settings_set_string_property(gtk_settings_get_default(),
+                                       "gtk-color-palette", default_palette,
+                                       "XProperty"); // restore default
+#elif CURSES
+    // TODO:
+    out = copy("");
 #endif
   }
   if (strcmp(out, "0") == 0 && string_output)
@@ -1420,11 +1495,14 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #define HELP_OPTIONSELECT \
 "gtdialog optionselect [args]\n" \
 "  A group of options to select from.\n"
+#define HELP_COLORSELECT \
+"gtdialog colorselect [args]\n" \
+"  A color selection dialog.\n"
 #define HELP_ALL \
 "Usage: gtdialog type [args]\n" \
 "\n" \
 HELP_MSGBOX HELP_INPUTBOX HELP_FILE HELP_TEXTBOX HELP_PROGRESSBAR \
-HELP_DROPDOWN HELP_FILTEREDLIST HELP_OPTIONSELECT \
+HELP_DROPDOWN HELP_FILTEREDLIST HELP_OPTIONSELECT HELP_COLORSELECT \
 "\n" \
 "gtdialog help type\n" \
 "   Shows detailed documentation on gtdialog type\n"
@@ -1632,6 +1710,14 @@ HELP_DROPDOWN HELP_FILTEREDLIST HELP_OPTIONSELECT \
 "  --select indices\n" \
 "      The zero-based indices of the options in the option group to select.\n" \
 "      Each index must be a separate argument.\n"
+#define HELP_COLOR_COLORSELECT \
+"  --color color\n" \
+"      The initially selected color in “#RRGGBB” format.\n"
+#define HELP_PALETTE_COLORSELECT \
+"  --palette [list]\n" \
+"      The colors to show in the dialog's color palette. Up to 20 colors \n" \
+"      can be specified in “#RRGGBB” format. If no list is given, a default\n" \
+"      palette is shown.\n"
 
 // Help on dialog returns.
 #define HELP_MSGBOX_RETURN \
@@ -1699,6 +1785,9 @@ HELP_DROPDOWN HELP_FILTEREDLIST HELP_OPTIONSELECT \
 "string contains the label of the button pressed followed by a newline and\n" \
 "the selected option(s), “timeout” if the dialog timed out, or “delete” if\n" \
 "the user canceled the dialog.\n"
+#define HELP_COLORSELECT_RETURN \
+"The colorselect dialog returns a string containing the color selected in\n" \
+"\"#RRGGBB\" format, or the empty string if the user cancelled the dialog.\n"
 
 // Help with dialog examples.
 #define HELP_MSGBOX_EXAMPLE \
@@ -1729,6 +1818,8 @@ HELP_DROPDOWN HELP_FILTEREDLIST HELP_OPTIONSELECT \
 "    --informative-text 'Check the languages you understand' \\\n" \
 "    --items English French German Romanian Russian Spanish Swedish \\\n" \
 "    --select 0 2 --string-output --no-newline\n"
+#define HELP_COLORSELECT_EXAMPLE \
+"  gtdialog colorselect --title Foreground --color \"#FF0000\" --no-newline\n"
 
 // Help template.
 #define HELP(type, args, returns, example) \
@@ -1861,6 +1952,14 @@ int help(int argc, char *argv[]) {
               HELP_OPTIONSELECT_RETURN
               HELP_LOCALIZED_BUTTONS,
               HELP_OPTIONSELECT_EXAMPLE));
+    break;
+  case GTDIALOG_COLORSELECT:
+    puts(HELP(HELP_COLORSELECT,
+              HELP_COLOR_COLORSELECT
+              HELP_PALETTE_COLORSELECT
+              HELP_FLOAT,
+              HELP_COLORSELECT_RETURN,
+              HELP_COLORSELECT_EXAMPLE));
     break;
   default:
     puts(HELP_ALL);

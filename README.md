@@ -20,14 +20,16 @@ lists and more.
 ## Features
 
 * Graphical (GTK) or terminal-based (curses) dialogs.
-* 14 different dialog types including:
+* 16 different dialog types including:
   + Messageboxes
   + Inputboxes
   + File selections
   + Textbox
-  + Progressbar
+  + Progressbar (GTK only)
   + Dropdown lists
-  + Filtered lists
+  + Filtered list
+  + Option list
+  + Color selector (GTK only)
 * No knowledge of GTK or curses is required to use either the command-line
   program or C library.
 * Any programming language with shell access can utilize the command-line

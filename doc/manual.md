@@ -345,8 +345,6 @@ dialog timed out, or “delete” if the user canceled the dialog.
     Prompt for directory selection in `fileselect`.
 =`--no-create-directories`=
     Prevent the user from creating new directories in filesave.
-=`--no-utf8`=
-    Do not automatically convert filenames to UTF-8. Only applicable in curses.
 
 **Returns**
 
@@ -431,7 +429,7 @@ user canceled the dialog.
   <img src="images/progressbar.png" alt="progressbar"/>
 </div>
 
-## Progressbar
+## Progressbar (GTK Only)
 
 =`gtdialog progressbar` *args*=
     A progressbar dialog with updates from stdin.
@@ -673,6 +671,48 @@ the user canceled the dialog.
       --informative-text 'Check the languages you understand' \
       --items English French German Romanian Russian Spanish Swedish \
       --select 0 2 --string-output --no-newline
+
+- - -
+
+<div style="float:right;">
+  <img src="images/colorselect.png" alt="colorselect"/>
+</div>
+
+## Color Selection (GTK Only)
+
+=`gtdialog colorselect` *args*=
+    A color selection dialog.
+
+**Arguments**
+
+=`--title str`=
+    The dialog's title text.
+=`--string-output`=
+    Output the names of selected buttons/items or exit codes instead of
+    button/item indexes or exit code numbers.
+=`--no-newline`=
+    Do not output the default trailing newline.
+=`--width int`=
+    Manually set the width of the dialog in pixels if possible.
+=`--height int`=
+    Manually set the height of the dialog in pixels if possible.
+=`--color`=
+    The initially selected color in `"#RRGGBB"` format.
+=`--palette [list]`=
+    The colors to show in the dialog's color palette. Up to 20 colors can be
+    specified in `"#RRGGBB"` format. If no list is given, a default palette is
+    shown.
+=`--float`=
+    Show the dialog on top of all windows.
+
+**Returns**
+
+The colorselect dialog returns a string containing the color selected in
+`"#RRGGBB"` format, or the empty string if the user cancelled the dialog.
+
+**Example**
+
+    gtdialog colorselect --title Foreground --color "#FF0000" --no-newline
 
 ## Localization
 
