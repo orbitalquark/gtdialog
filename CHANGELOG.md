@@ -5,6 +5,26 @@
 [Atom Feed]: feed
 [PGP Public Key]: https://foicica.com/foicica.pgp
 
+## 1.4 (25 Jun 2017)
+
+Download:
+
+* [gtDialog 1.4][] | [PGP -- 1.4][]
+
+Bugfixes:
+
+* None.
+
+Changes:
+
+* New [colorselect][] dialog for selecting colors.
+* New [fontselect][] dialog for selecting fonts.
+
+[gtDialog 1.4]: download/gtdialog_1.4.zip
+[PGP -- 1.4]: download/gtdialog_1.4.zip.asc
+[optionselect]: manual.html#Color.Selection..GTK.Only.
+[fontselect]: manual.html#Font.Selection..GTK.Only.
+
 ## 1.3 (29 Aug 2016)
 
 Download:
