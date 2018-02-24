@@ -16,7 +16,7 @@ ifeq (, $(findstring curses, $(MAKECMDGOALS)))
   gtk_libs = $(shell pkg-config --libs gtk+-$(gtk_version))
   install_targets = gtdialog
 else
-  curses_flags = -DCURSES -D_POSIX_C_SOURCE=200809L
+  curses_flags = -DCURSES
   curses_libs = -lncursesw -lcdk
   install_targets = gtdialog-curses
 endif

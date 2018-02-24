@@ -394,9 +394,9 @@ static int entry_keypress(EObjectType cdkType, void *object, void *data,
   return TRUE;
 }
 
-#if _WIN32
-#define stpcpy(d, s) (strcpy(d, s), d + strlen(s))
-#endif
+// Does not exist on _WIN32, but exists on other platforms with or without
+// feature test macros. Just define as a macro anyway.
+#define stpcpy_(d, s) (strcpy(d, s), d + strlen(s))
 
 #if !HAVE_CDKUTF8
 /** Returns the number of bytes in the given UTF-8 character. */
@@ -448,10 +448,10 @@ static char **item_rows(char **cols, int ncols, char **items, int len) {
   char **new_items = malloc(sizeof(char *) * ((len + ncols - 1) / ncols + 1));
   for (int i = -ncols; i < len; i += ncols) {
     char *new_item = malloc((i < 0) ? row_len + 4 : row_len);
-    char *p = (i < 0) ? stpcpy(new_item, "</U>") : new_item;
+    char *p = (i < 0) ? stpcpy_(new_item, "</U>") : new_item;
     for (int j = i; j < i + ncols && j < len; j++) {
       char *item = (i < 0) ? cols[j - i] : items[j];
-      p = stpcpy(p, item);
+      p = stpcpy_(p, item);
       int padding = col_widths[j - i] - utf8strlen(item);
       while (padding-- > 0) *p++ = ' ';
       *p++ = (i < 0) ? '|' : ' ';
@@ -1131,7 +1131,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
   } else if (type == GTDIALOG_COLORSELECT) {
 #if GTK
-    dialog = gtk_color_selection_dialog_new(title);
+    dialog = gtk_color_selection_dialog_new(title); // TODO: deprecated GTK 3
     if (parent) gtk_window_set_transient_for(GTK_WINDOW(dialog), parent);
     if (floating) gtk_window_set_keep_above(GTK_WINDOW(dialog), TRUE);
     GtkColorSelectionDialog *dlg = GTK_COLOR_SELECTION_DIALOG(dialog);
@@ -1165,7 +1165,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
   } else if (type == GTDIALOG_FONTSELECT) {
 #if GTK
-    dialog = gtk_font_selection_dialog_new(title);
+    dialog = gtk_font_selection_dialog_new(title); // TODO: deprecated GTK 3
     if (parent) gtk_window_set_transient_for(GTK_WINDOW(dialog), parent);
     if (floating) gtk_window_set_keep_above(GTK_WINDOW(dialog), TRUE);
     GtkFontSelectionDialog *dlg = GTK_FONT_SELECTION_DIALOG(dialog);
@@ -1285,7 +1285,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
             txt = malloc(len), created = TRUE;
             char *p = txt;
             for (i = 0; i < nrows; i++)
-              p = stpcpy(p, getCDKEntryValue(entries[i])), *p++ = '\n';
+              p = stpcpy_(p, getCDKEntryValue(entries[i])), *p++ = '\n';
             if (p - txt > 0) *p = '\0'; // chomp '\n'
           } else txt = copy(getCDKEntryValue(entry)), created = TRUE;
 #endif
@@ -1372,7 +1372,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
             for (i = 0; i < len; i++)
               if (options->selections[i]) {
                 if (string_output)
-                  p = stpcpy(p, items[i]), *p++ = '\n';
+                  p = stpcpy_(p, items[i]), *p++ = '\n';
                 else
                   p += sprintf(p, "%i\n", i);
               }
