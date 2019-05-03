@@ -521,7 +521,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
   else if (type == GTDIALOG_TEXTBOX)
 #if GTK
-    height = 300, width = 400, buttons[0] = STR_OK;
+    height = 500, width = 800, buttons[0] = STR_OK;
 #elif CURSES
     height = 20, buttons[0] = STR_OK;
 #endif
@@ -533,7 +533,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     buttons[0] = STR_OK, buttons[1] = STR_CANCEL;
   else if (type == GTDIALOG_FILTEREDLIST)
 #if GTK
-    height = 360, width = 500, buttons[0] = STR_OK;
+    height = 500, width = 800, buttons[0] = STR_OK;
 #elif CURSES
     height = 20, buttons[0] = STR_OK;
 #endif
