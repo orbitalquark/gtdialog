@@ -72,24 +72,14 @@ static int indeterminate, stoppable, string_output, output_col = 1,
 #if GTK
 // Translate GTK 2.x API to GTK 3.0 for compatibility.
 #if GTK_CHECK_VERSION(3,0,0)
-#define gtk_hbox_new(_,s) gtk_box_new(GTK_ORIENTATION_HORIZONTAL, s)
-#define gtk_vbox_new(_,s) gtk_box_new(GTK_ORIENTATION_VERTICAL, s)
 #define gtk_combo_box_new_text gtk_combo_box_text_new
 #define gtk_combo_box_append_text(w,t) \
   gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(w),t)
 #define gtk_combo_box_get_active_text(w) \
   gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(w))
 #endif
-#if !GTK_CHECK_VERSION(3,4,0)
 #define attach(...) gtk_table_attach(GTK_TABLE(table), __VA_ARGS__)
 #define FILL(option) (GtkAttachOptions)(GTK_FILL | GTK_##option)
-#else
-// GTK 3.4 deprecated tables; translate from 2.x for compatibility.
-#define gtk_table_new(...) \
-  gtk_grid_new(), gtk_grid_set_column_spacing(GTK_GRID(table), 5)
-#define attach(w, x1, _, y1, __, ...) \
-  gtk_grid_attach(GTK_GRID(table), w, x1, y1, 1, 1)
-#endif
 #endif
 #define copy(s) strcpy(malloc(strlen(s) + 1), s)
 
@@ -363,7 +353,7 @@ static char *strdown(char *s) {
 
 /** Signal for a keypress in the filteredlist entry. */
 static int entry_keypress(EObjectType cdkType, void *object, void *data,
-                           chtype key) {
+                          chtype key) {
   Model *model = (Model *)data;
   char *entry_text = getCDKEntryValue((CDKENTRY *)object);
   if (strlen(entry_text) > 0) {
