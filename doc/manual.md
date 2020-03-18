@@ -429,10 +429,11 @@ user canceled the dialog.
   <img src="images/progressbar.png" alt="progressbar"/>
 </div>
 
-## Progressbar (GTK Only)
+## Progressbar
 
 =`gtdialog progressbar` *args*=
-    A progressbar dialog with updates from stdin.
+    A progressbar dialog with updates from stdin (GTK only) or a callback
+    function (C library only).
 
 **Arguments**
 
@@ -460,15 +461,15 @@ user canceled the dialog.
 
 **Returns**
 
-The progressbar dialog reads lines from standard input (stdin) and updates the
-progressbar until the dialog receives an EOF. Input lines are of the form “num
-str\n” where “num” is a progress percentage between 0 and 100 and “str” is
-optional progress display text. The newline character (‘\n’) is required. If
-“str” is empty, the current progress display text is retained. If `--stoppable`
-is given and “str” is either “stop disable” or “stop enable”, the Stop button is
-disabled or enabled, respectively. The dialog returns the string “stopped” only
-if `--stopped` was given and the Stop button was pressed. Otherwise it returns
-nothing.
+The progressbar dialog reads lines from standard input (stdin) or a callback
+function and updates the progressbar until the dialog receives an EOF or `NULL`.
+Input lines are of the form “num str\n” where “num” is a progress percentage
+between 0 and 100 and “str” is optional progress display text. The newline
+character (‘\n’) is required. If “str” is empty, the current progress display
+text is retained. If `--stoppable` is given and “str” is either “stop disable”
+or “stop enable”, the Stop button is disabled or enabled, respectively. The
+dialog returns the string “stopped” only if `--stoppable` was given and the Stop
+button was pressed. Otherwise it returns nothing.
 
 **Example**
 

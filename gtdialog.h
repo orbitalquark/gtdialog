@@ -55,9 +55,44 @@ enum GTDialogTypes {
 typedef enum GTDialogTypes GTDialogType;
 
 #if GTK
+/**
+ * Sets the parent window for gtdialogs.
+ * @param window The parent window.
+ */
 void gtdialog_set_parent(GtkWindow *parent);
 #endif
+
+/**
+ * Sets the callback function used for progressbar dialogs.
+ * @param callback Function to call to do some work. It must return either a
+ *   newly allocated string of the form "num str\n", where num is integer
+ *   progress between 0 and 100 and str is optional progress display text, or
+ *   it must return `NULL`, signaling work is complete. The returned string will
+ *   be freed by the caller.
+ * @param data Optional userdata passed to the callback function.
+ */
+void gtdialog_set_progressbar_callback(char *(*f)(void *), void *userdata);
+
+/**
+ * Returns the GTDialogType for the given type string.
+ * @param type The string dialog type. Acceptable types are "msgbox",
+ *   "ok-msgbox", "yesno-msgbox", "inputbox", "standard-inputbox",
+ *   "secure-inputbox", "secure-standard-inputbox", "fileselect", "filesave",
+ *   "textbox", "progressbar", "dropdown", "standard-dropdown", "filteredlist",
+ *   "optionselect", "colorselect", and "fontselect".
+ * @return GTDialogType or GTDIALOG_UNKNOWN
+ */
 GTDialogType gtdialog_type(const char *type);
+
+/**
+ * Creates, displays, and returns the result from a gtdialog of the given type
+ * from the given set of parameters.
+ * The string returned must be freed when finished.
+ * @param type The GTDialogType type.
+ * @param narg The number of parameters in *args*.
+ * @param args The set of parameters for the dialog.
+ * @return string result
+ */
 char *gtdialog(GTDialogType type, int narg, const char *args[]);
 
 #endif

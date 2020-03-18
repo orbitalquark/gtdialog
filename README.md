@@ -25,7 +25,7 @@ lists and more.
   + Inputboxes
   + File selections
   + Textbox
-  + Progressbar (GTK only)
+  + Progressbar
   + Dropdown lists
   + Filtered list
   + Option list

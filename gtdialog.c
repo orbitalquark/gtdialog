@@ -46,7 +46,10 @@
 
 #if GTK
 static GtkWindow *parent;
-#else
+#endif
+static char *(*progressbar_cb)(void *);
+static void *progressbar_cb_userdata;
+#if CURSES
 static CDKENTRY *focused_entry;
 #endif
 static int RESPONSE_DELETE = -1, RESPONSE_TIMEOUT = 0, RESPONSE_CHANGE = 4;
@@ -84,24 +87,15 @@ static int indeterminate, stoppable, string_output, output_col = 1,
 #define copy(s) strcpy(malloc(strlen(s) + 1), s)
 
 #if GTK
-/**
- * Sets the parent window for gtdialogs.
- * @param window The parent window.
- */
 void gtdialog_set_parent(GtkWindow *window) {
   parent = window;
 }
 #endif
 
-/**
- * Returns the GTDialogType for the given type string.
- * @param type The string dialog type. Acceptable types are "msgbox",
- *   "ok-msgbox", "yesno-msgbox", "inputbox", "standard-inputbox",
- *   "secure-inputbox", "secure-standard-inputbox", "fileselect", "filesave",
- *   "textbox", "progressbar", "dropdown", "standard-dropdown", "filteredlist",
- *   "optionselect", "colorselect", and "fontselect".
- * @return GTDialogType or GTDIALOG_UNKNOWN
- */
+void gtdialog_set_progressbar_callback(char *(*f)(void *), void *data) {
+  progressbar_cb = f, progressbar_cb_userdata = data;
+}
+
 GTDialogType gtdialog_type(const char *type) {
   if (strcmp(type, "msgbox") == 0)
     return GTDIALOG_MSGBOX;
@@ -159,43 +153,73 @@ static gboolean entry_keypress(GtkWidget *entry, GdkEventKey *event,
   return FALSE;
 }
 
+/**
+ * Processes input for the progressbar.
+ * @param input String of the form "num str\n", where num is integer progress
+ *   between 0 and 100 and str is optional progress display text. If the text
+ *   is "stop disable" or "stop enable", enables or disables the "Stop" button,
+ *   respectively.
+ *   This string will be modified in place.
+ * @param data Progressbar widget data.
+ */
+static void process_progressbar_input(char *input, gpointer data) {
+  GtkWidget *dialog = (GtkWidget *)data;
+  GtkWidget *box = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
+  GList *children = gtk_container_get_children(GTK_CONTAINER(box));
+  GtkWidget *progressbar = (GtkWidget *)children->data;
+  char *p = input;
+  while (!isspace(*p)) p++;
+  *p = '\0', p[strlen(p + 1)] = '\0'; // chomp '\n'
+  if (!indeterminate)
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progressbar),
+                                  0.01 * atoi(input));
+  else
+    gtk_progress_bar_pulse(GTK_PROGRESS_BAR(progressbar));
+  if (*(p + 1)) {
+    if (stoppable) {
+      box = gtk_dialog_get_action_area(GTK_DIALOG(dialog));
+      GList *children2 = gtk_container_get_children(GTK_CONTAINER(box));
+      GtkWidget *button = (GtkWidget *)children2->data;
+      if (strcmp(p + 1, "stop enable") == 0)
+        gtk_widget_set_sensitive(button, TRUE);
+      else if (strcmp(p + 1, "stop disable") == 0)
+        gtk_widget_set_sensitive(button, FALSE);
+      else
+        gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), p + 1);
+      g_list_free(children2);
+    } else gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), p + 1);
+  }
+  g_list_free(children);
+}
+
 /** Signal for when stdin is available for the progressbar. */
 static gboolean read_stdin(GIOChannel *ch, GIOCondition cond, gpointer data) {
-  GtkWidget *dialog = (GtkWidget *)data, *box, *progressbar, *button;
+  GtkWidget *dialog = (GtkWidget *)data;
   if (cond == G_IO_IN) {
-    char *input, *p;
+    char *input;
     int status = g_io_channel_read_line(ch, &input, NULL, NULL, NULL);
     if (status == G_IO_STATUS_NORMAL) {
-      box = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
-      GList *children = gtk_container_get_children(GTK_CONTAINER(box));
-      progressbar = (GtkWidget *)children->data;
-      p = input;
-      while (!isspace(*p)) p++;
-      *p = '\0', p[strlen(p + 1)] = '\0'; // chomp '\n'
-      if (!indeterminate)
-        gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progressbar),
-                                      0.01 * atoi(input));
-      else
-        gtk_progress_bar_pulse(GTK_PROGRESS_BAR(progressbar));
-      if (*(p + 1)) {
-        if (stoppable) {
-          box = gtk_dialog_get_action_area(GTK_DIALOG(dialog));
-          GList *children2 = gtk_container_get_children(GTK_CONTAINER(box));
-          button = (GtkWidget *)children2->data;
-          if (strcmp(p + 1, "stop enable") == 0)
-            gtk_widget_set_sensitive(button, TRUE);
-          else if (strcmp(p + 1, "stop disable") == 0)
-            gtk_widget_set_sensitive(button, FALSE);
-          else
-            gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), p + 1);
-          g_list_free(children2);
-        } else gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), p + 1);
-      }
+      process_progressbar_input(input, data);
       free(input);
-      g_list_free(children);
     }
-  } else g_signal_emit_by_name(dialog, "response", 2); // 1 is for Stop pressed
+  } else g_signal_emit_by_name(dialog, "response", 0); // 1 is for Stop pressed
   return !(cond & G_IO_HUP);
+}
+
+/**
+ * Timeout function for calling the progressbar callback function to do some
+ * work.
+ * @param data Progressbar widget data.
+ */
+static gboolean call_progressbar_callback(gpointer data) {
+  if (!progressbar_cb) return FALSE;
+  char *input = progressbar_cb(progressbar_cb_userdata);
+  if (!input)
+    return (g_signal_emit_by_name((GtkWidget *)data, "response", 0), FALSE); // 1 is for Stop pressed
+  process_progressbar_input(input, data);
+  free(input);
+  while (gtk_events_pending()) gtk_main_iteration();
+  return TRUE;
 }
 
 /**
@@ -463,15 +487,6 @@ static int scrolled_key(EObjectType cdkType, void *object, void *data,
 }
 #endif
 
-/**
- * Creates, displays, and returns the result from a gtdialog of the given type
- * from the given set of parameters.
- * The string returned must be freed when finished.
- * @param type The GTDialogType type.
- * @param narg The number of parameters in *args*.
- * @param args The set of parameters for the dialog.
- * @return string result
- */
 char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if (CURSES && LIBRARY && !_WIN32)
   struct termios term;
@@ -724,7 +739,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   CDKLABEL *labelt, *labeli;
   CDKENTRY *entry, *entries[nrows + 1];
   CDKMENTRY *textview;
-//  CDKSLIDER *progressbar;
+  CDKSLIDER *progressbar;
   CDKITEMLIST *combobox;
   CDKBUTTONBOX *buttonbox;
   CDKSCROLL *scrolled;
@@ -944,7 +959,9 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if (LIBRARY && !_WIN32)
       tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
 #endif
-      // TODO:
+      progressbar = newCDKSlider(dialog, LEFT, TOP, (char*)title, "",
+                                 ' ' | A_REVERSE, 0, percent, 0, 100, 1, 2,
+                                 FALSE, FALSE);
 #endif
     } else if (type == GTDIALOG_DROPDOWN ||
                type == GTDIALOG_STANDARD_DROPDOWN) {
@@ -1402,21 +1419,69 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   } else if (type == GTDIALOG_PROGRESSBAR) {
 #if GTK
     gtk_widget_show_all(GTK_WIDGET(dialog));
+    if (!progressbar_cb) {
 #if !_WIN32
-    GIOChannel *ch = g_io_channel_unix_new(0);
+      GIOChannel *ch = g_io_channel_unix_new(0);
 #else
-    GIOChannel *ch = g_io_channel_win32_new_fd(0); // TODO: test
+      GIOChannel *ch = g_io_channel_win32_new_fd(0); // TODO: test
 #endif
-    g_io_channel_set_encoding(ch, NULL, NULL);
-    int source = g_io_add_watch(ch, G_IO_IN | G_IO_HUP, read_stdin, dialog);
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) != 1)
-      out = copy("");
-    else
-      out = copy("stopped");
-    g_source_remove(source), g_io_channel_unref(ch), g_io_channel_unref(ch);
+      g_io_channel_set_encoding(ch, NULL, NULL);
+      int source = g_io_add_watch(ch, G_IO_IN | G_IO_HUP, read_stdin, dialog);
+      if (gtk_dialog_run(GTK_DIALOG(dialog)) != 1)
+        out = copy("");
+      else
+        out = copy("stopped");
+      g_source_remove(source), g_io_channel_unref(ch), g_io_channel_unref(ch);
+    } else {
+      g_timeout_add(0, call_progressbar_callback, dialog);
+      if (gtk_dialog_run(GTK_DIALOG(dialog)) != 1)
+        out = copy("");
+      else
+        out = copy("stopped");
+      progressbar_cb = NULL, progressbar_cb_userdata = NULL;
+    }
 #elif CURSES
-    // TODO:
-    out = copy("");
+    if (progressbar_cb) {
+      WINDOW *border = newwin(height, width, 1, 1);
+      box(border, 0, 0), wrefresh(border);
+      refreshCDKScreen(dialog), drawCDKButtonbox(buttonbox, TRUE);
+      int stop_enabled = stoppable;
+      char *input;
+      while ((input = progressbar_cb(progressbar_cb_userdata))) {
+        char *p = input;
+        while (!isspace(*p)) p++;
+        *p = '\0', p[strlen(p + 1)] = '\0'; // chomp '\n'
+        if (!indeterminate)
+          setCDKSliderValue(progressbar, atoi(input));
+        if (*(p + 1)) {
+          if (stoppable) {
+            if (strcmp(p + 1, "stop enable") == 0) {
+              stop_enabled = TRUE;
+              setCDKButtonboxHighlight(buttonbox, A_REVERSE);
+            } else if (strcmp(p + 1, "stop disable") == 0) {
+              stop_enabled = FALSE;
+              setCDKButtonboxHighlight(buttonbox, A_NORMAL);
+            }
+            // TODO: set text p + 1
+          }
+          // TODO: set text p + 1
+        }
+        free(input);
+        timeout(0);
+        int key = getch();
+        timeout(-1);
+        if (key == KEY_ENTER && stop_enabled) {
+          out = copy("stopped");
+          break;
+        }
+        refreshCDKScreen(dialog), drawCDKButtonbox(buttonbox, TRUE);
+      }
+      wborder(border, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '), wrefresh(border);
+      delwin(border);
+      destroyCDKSlider(progressbar);
+      destroyCDKButtonbox(buttonbox);
+    }
+    if (!out) out = copy("");
 #endif
   } else if (type == GTDIALOG_COLORSELECT) {
 #if GTK
@@ -1810,7 +1875,7 @@ HELP_FONTSELECT \
 "is required. If “str” is empty, the current progress display text is\n" \
 "retained. If --stoppable is given and “str” is either “stop disable” or\n" \
 "“stop enable”, the Stop button is disabled or enabled, respectively.\n" \
-"The dialog returns the string “stopped” only if --stopped was given and\n" \
+"The dialog returns the string “stopped” only if --stoppable was given and\n" \
 "the Stop button was pressed. Otherwise it returns nothing.\n"
 #define HELP_DROPDOWN_RETURN \
 "The dropdown dialogs return a string containing the number of the button\n" \
