@@ -1412,6 +1412,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     } else out = copy("");
 #elif CURSES
     char *txt = activateCDKFselect(fileselect, NULL);
+    if (select_only_dirs) txt = getCDKFselectDirectory(fileselect);
     out = txt ? copy(txt) : copy("");
     destroyCDKFselect(fileselect);
     chdir(cwd);
