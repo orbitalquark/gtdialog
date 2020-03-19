@@ -1445,7 +1445,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     if (progressbar_cb) {
       WINDOW *border = newwin(height, width, 1, 1);
       box(border, 0, 0), wrefresh(border);
-      refreshCDKScreen(dialog), drawCDKButtonbox(buttonbox, TRUE);
+      refreshCDKScreen(dialog);
+      if (stoppable) drawCDKButtonbox(buttonbox, TRUE);
       int stop_enabled = stoppable;
       char *input;
       while ((input = progressbar_cb(progressbar_cb_userdata))) {
@@ -1471,11 +1472,12 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         timeout(0);
         int key = getch();
         timeout(-1);
-        if (key == KEY_ENTER && stop_enabled) {
+        if ((key == KEY_ENTER || key == '\n') && stop_enabled) {
           out = copy("stopped");
           break;
         }
-        refreshCDKScreen(dialog), drawCDKButtonbox(buttonbox, TRUE);
+        refreshCDKScreen(dialog);
+        if (stoppable) drawCDKButtonbox(buttonbox, TRUE);
       }
       wborder(border, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '), wrefresh(border);
       delwin(border);
@@ -1756,7 +1758,7 @@ HELP_FONTSELECT \
 "      The initial progressbar percentage between 0 and 100.\n"
 #define HELP_TEXT_PROGRESSBAR \
 "  --text str\n" \
-"      The initial progressbar display text.\n"
+"      The initial progressbar display text. (GTK only.)\n"
 #define HELP_INDETERMINATE \
 "  --indeterminate\n" \
 "      Show the progressbar as “busy” with no percentage updates.\n"
@@ -1869,15 +1871,16 @@ HELP_FONTSELECT \
 "newline followed by the textbox text; otherwise “timeout” if the dialog\n" \
 "timed out or “delete” if the user canceled the dialog.\n"
 #define HELP_PROGRESSBAR_RETURN \
-"The progressbar dialog reads lines from standard input (stdin) and updates\n" \
-"the progressbar until the dialog receives an EOF. Input lines are of the\n" \
-"form “num str\\n” where “num” is a progress percentage between 0 and 100\n" \
-"and “str” is optional progress display text. The newline character (‘\\n’)\n" \
-"is required. If “str” is empty, the current progress display text is\n" \
-"retained. If --stoppable is given and “str” is either “stop disable” or\n" \
-"“stop enable”, the Stop button is disabled or enabled, respectively.\n" \
-"The dialog returns the string “stopped” only if --stoppable was given and\n" \
-"the Stop button was pressed. Otherwise it returns nothing.\n"
+"The progressbar dialog reads lines from standard input (stdin) or a\n" \
+"callback function and updates the progressbar until the dialog receives an\n" \
+"EOF or NULL. Input lines are of the form “num str\\n” where “num” is a\n" \
+"progress percentage between 0 and 100 and “str” is optional progress\n" \
+"display text. The newline character (‘\\n’) is required. If “str” is\n" \
+"empty, the current progress display text is retained. If --stoppable is\n" \
+"given and “str” is either “stop disable” or “stop enable”, the Stop button\n" \
+"is disabled or enabled, respectively. The dialog returns the string\n" \
+"“stopped” only if --stoppable was given and the Stop button was pressed.\n" \
+"Otherwise it returns nothing.\n"
 #define HELP_DROPDOWN_RETURN \
 "The dropdown dialogs return a string containing the number of the button\n" \
 "pressed (or ‘4’ if --exit-onchange was responsible) followed by a newline\n" \

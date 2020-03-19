@@ -451,7 +451,7 @@ user canceled the dialog.
 =`--percent int`=
     The initial progressbar percentage between 0 and 100.
 =`--text str`=
-    The initial progressbar display text.
+    The initial progressbar display text. (GTK only.)
 =`--indeterminate`=
     Show the progressbar as “busy” with no percentage updates.
 =`--stoppable`=
@@ -464,12 +464,12 @@ user canceled the dialog.
 The progressbar dialog reads lines from standard input (stdin) or a callback
 function and updates the progressbar until the dialog receives an EOF or `NULL`.
 Input lines are of the form “num str\n” where “num” is a progress percentage
-between 0 and 100 and “str” is optional progress display text. The newline
-character (‘\n’) is required. If “str” is empty, the current progress display
-text is retained. If `--stoppable` is given and “str” is either “stop disable”
-or “stop enable”, the Stop button is disabled or enabled, respectively. The
-dialog returns the string “stopped” only if `--stoppable` was given and the Stop
-button was pressed. Otherwise it returns nothing.
+between 0 and 100 and “str” is optional progress display text (GTK only). The
+newline character (‘\n’) is required. If “str” is empty, the current progress
+display text is retained. If `--stoppable` is given and “str” is either “stop
+disable” or “stop enable”, the Stop button is disabled or enabled, respectively.
+The dialog returns the string “stopped” only if `--stoppable` was given and the
+Stop button was pressed. Otherwise it returns nothing.
 
 **Example**
 
