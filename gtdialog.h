@@ -69,9 +69,9 @@ void gtdialog_set_parent(GtkWindow *parent);
  *   progress between 0 and 100 and str is optional progress display text, or
  *   it must return `NULL`, signaling work is complete. The returned string will
  *   be freed by the caller.
- * @param data Optional userdata passed to the callback function.
+ * @param data Optional data passed to the callback function.
  */
-void gtdialog_set_progressbar_callback(char *(*f)(void *), void *userdata);
+void gtdialog_set_progressbar_callback(char *(*f)(void *), void *data);
 
 /**
  * Returns the GTDialogType for the given type string.
