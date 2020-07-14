@@ -635,7 +635,7 @@ or “delete” if the user canceled the dialog.
       Manually set the width of the dialog in pixels if possible.
 =`--height int`=
       Manually set the height of the dialog in pixels if possible.
-=`--informative-text str`=
+=`--text str`=
       The main message text.
 =`--items list`=
       The options to show in the option group. Each item must be a
@@ -669,7 +669,7 @@ the user canceled the dialog.
 **Example**
 
     gtdialog optionselect --title Languages \
-      --informative-text 'Check the languages you understand' \
+      --text 'Check the languages you understand' \
       --items English French German Romanian Russian Spanish Swedish \
       --select 0 2 --string-output --no-newline
 

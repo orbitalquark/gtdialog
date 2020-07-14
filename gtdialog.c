@@ -620,7 +620,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       if (type == GTDIALOG_PROGRESSBAR) indeterminate = TRUE;
     } else if (strcmp(arg, "--informative-text") == 0) {
       if (type < GTDIALOG_FILESELECT || type == GTDIALOG_TEXTBOX ||
-          type == GTDIALOG_FILTEREDLIST || type == GTDIALOG_OPTIONSELECT) {
+          type == GTDIALOG_FILTEREDLIST) {
         info_text = args[i++];
         if (type >= GTDIALOG_INPUTBOX &&
             type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
@@ -1077,7 +1077,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #elif CURSES
       const char *choices[] = {"[ ]", "[x]"};
       options = newCDKSelection(
-        dialog, LEFT, TOP, NONE, height - 5, 0, (char *)info_text,
+        dialog, LEFT, TOP, NONE, height - 5, 0, (char *)text,
         (char **)items, len, (char **)choices, 2, A_REVERSE, FALSE, FALSE);
 #endif
       for (i = 0; i < select; i++) {
@@ -1820,8 +1820,8 @@ HELP_FONTSELECT \
 #define HELP_OUTPUT_COLUMN \
 "  --output-column int\n" \
 "      The column number to use for --string-output. The default is 1.\n"
-#define HELP_INFORMATIVE_TEXT_OPTIONSELECT \
-"  --informative-text str\n" \
+#define HELP_TEXT_OPTIONSELECT \
+"  --text str\n" \
 "      The main message text.\n"
 #define HELP_ITEMS_OPTIONSELECT \
 "  --items list\n" \
@@ -1955,7 +1955,7 @@ HELP_FONTSELECT \
 "    --items a b c d --no-newline\n"
 #define HELP_OPTIONSELECT_EXAMPLE \
 "  gtdialog optionselect --title Languages \\\n" \
-"    --informative-text 'Check the languages you understand' \\\n" \
+"    --text 'Check the languages you understand' \\\n" \
 "    --items English French German Romanian Russian Spanish Swedish \\\n" \
 "    --select 0 2 --string-output --no-newline\n"
 #define HELP_COLORSELECT_EXAMPLE \
@@ -2092,7 +2092,7 @@ int help(int argc, char *argv[]) {
   case GTDIALOG_OPTIONSELECT:
     puts(HELP(
       HELP_OPTIONSELECT,
-      HELP_INFORMATIVE_TEXT_OPTIONSELECT
+      HELP_TEXT_OPTIONSELECT
       HELP_ITEMS_OPTIONSELECT
       HELP_SELECT_OPTIONSELECT
       HELP_BUTTON1
