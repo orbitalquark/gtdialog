@@ -709,7 +709,7 @@ the user canceled the dialog.
 **Returns**
 
 The colorselect dialog returns a string containing the color selected in
-“#RRGGBB” format, or the empty string if the user cancelled the dialog.
+“#RRGGBB” format, or the empty string if the user canceled the dialog.
 
 **Example**
 
@@ -754,7 +754,7 @@ The colorselect dialog returns a string containing the color selected in
 **Returns**
 
 The fontselect dialog returns a string containing the font selected (including
-style and size), or the empty string if the user cancelled the dialog.
+style and size), or the empty string if the user canceled the dialog.
 
 **Example**
 

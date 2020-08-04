@@ -32,6 +32,7 @@
 #if GTK
 #include <gtk/gtk.h>
 #include <gdk/gdk.h>
+#include <gdk/gdkkeysyms.h>
 #elif CURSES
 #include <unistd.h>
 #if (LIBRARY && !_WIN32)
@@ -1433,6 +1434,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
   } else if (type == GTDIALOG_PROGRESSBAR) {
 #if GTK
+    gtk_binding_entry_remove(
+      gtk_binding_set_by_class(GTK_DIALOG_GET_CLASS(dialog)), GDK_Escape, 0);
     gtk_widget_show_all(GTK_WIDGET(dialog));
     if (!progressbar_cb) {
 #if !_WIN32
@@ -1448,11 +1451,12 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         out = copy("stopped");
       g_source_remove(source), g_io_channel_unref(ch), g_io_channel_unref(ch);
     } else {
-      g_timeout_add(0, call_progressbar_callback, dialog);
+      int source = g_timeout_add(0, call_progressbar_callback, dialog);
       if (gtk_dialog_run(GTK_DIALOG(dialog)) != 1)
         out = copy("");
       else
         out = copy("stopped");
+      g_source_remove(source);
       progressbar_cb = NULL, progressbar_cb_userdata = NULL;
     }
 #elif CURSES
@@ -1923,10 +1927,10 @@ HELP_FONTSELECT \
 "the user canceled the dialog.\n"
 #define HELP_COLORSELECT_RETURN \
 "The colorselect dialog returns a string containing the color selected in\n" \
-"“#RRGGBB” format, or the empty string if the user cancelled the dialog.\n"
+"“#RRGGBB” format, or the empty string if the user canceled the dialog.\n"
 #define HELP_FONTSELECT_RETURN \
 "The fontselect dialog returns a string containing the font selected\n" \
-"(including style and size), or the empty string if the user cancelled the \n" \
+"(including style and size), or the empty string if the user canceled the \n" \
 "dialog.\n"
 
 // Help with dialog examples.
