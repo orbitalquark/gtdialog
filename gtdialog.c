@@ -1434,9 +1434,11 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
   } else if (type == GTDIALOG_PROGRESSBAR) {
 #if GTK
+#ifndef LIBRARY
     gtk_binding_entry_remove(
       gtk_binding_set_by_class(GTK_DIALOG_GET_CLASS(dialog)), GDK_KEY_Escape,
       0);
+#endif
     gtk_widget_show_all(GTK_WIDGET(dialog));
     if (!progressbar_cb) {
 #if !_WIN32
