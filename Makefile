@@ -54,19 +54,3 @@ docs: docs/index.md $(wildcard docs/*.md) | docs/_layouts/default.html
 	done
 docs/index.md: README.md ; sed 's/^\# gtDialog/## Introduction/;' $< > $@
 cleandoc: ; rm -f docs/*.html docs/index.md
-
-# Package.
-
-basedir = gtdialog_$(shell grep '^\#\#\#' docs/changelog.md | head -1 | \
-                           cut -d ' ' -f 2)
-
-ifneq (, $(shell hg summary 2>/dev/null))
-  archive = hg archive -X ".hg*" $(1)
-else
-  archive = git archive HEAD --prefix $(1)/ | tar -xf -
-endif
-
-release: docs
-	$(call archive,$(basedir))
-	cp -rL docs $(basedir)
-	zip -r $(basedir).zip $(basedir) && rm -r $(basedir) && gpg -ab $(basedir).zip
