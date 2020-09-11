@@ -103,8 +103,8 @@ Running `gtdialog help` shows a list of dialog types along with a brief
 description for each, and running `gtdialog help type` shows all available
 arguments for that dialog type.
 
-gtDialog comes with a reference guide in its *docs/* directory that covers all
-dialog types and their arguments. It is also available [online][].
+gtDialog comes with a [reference guide][] in its *docs/* directory that covers
+all dialog types and their arguments.
 
 In order to use gtDialog as a C library, add `#include "gtdialog.h"` to the
 source file you want to invoke gtDialog from, and then call `gtdialog()` with a
@@ -125,7 +125,7 @@ string. You are responsible for calling `free()` on the string returned by
       free(line_num);
     }
 
-[online]: https://orbitalquark.github.com/gtdialog/manual.html
+[reference guide]: https://orbitalquark.github.io/gtdialog/manual.html
 
 ## Contribute
 

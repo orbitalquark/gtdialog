@@ -52,5 +52,7 @@ docs: docs/index.md $(wildcard docs/*.md) | docs/_layouts/default.html
 	for file in $(basename $^); do \
 		cat $| | docs/fill_layout.lua $$file.md > $$file.html; \
 	done
-docs/index.md: README.md ; sed 's/^\# gtDialog/## Introduction/;' $< > $@
+docs/index.md: README.md
+	sed 's/^\# [[:alpha:]]\+/## Introduction/;' $< > $@
+	sed -i 's|https://[[:alpha:]]\+\.github\.io/[[:alpha:]]\+/||;' $@
 cleandoc: ; rm -f docs/*.html docs/index.md

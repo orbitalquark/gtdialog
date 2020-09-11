@@ -18,7 +18,7 @@ Changes:
 * Changed the optionselect dialog's `--informative-text` option to `--text`.
 
 [gtDialog 1.5]: https://github.com/orbitalquark/gtdialog/archive/gtdialog_1.5.zip
-[progressbar]: https://orbitalquark.github.io/gtdialog/manual.html#Progressbar
+[progressbar]: manual.html#Progressbar
 
 ### 1.4 (25 Jun 2017)
 
@@ -36,8 +36,8 @@ Changes:
 * New [fontselect][] dialog for selecting fonts.
 
 [gtDialog 1.4]: https://github.com/orbitalquark/gtdialog/archive/gtdialog_1.4.zip
-[colorselect]: https://orbitalquark.github.io/gtdialog/manual.html#Color.Selection..GTK.Only.
-[fontselect]: https://orbitalquark.github.io/gtdialog/manual.html#Font.Selection..GTK.Only.
+[colorselect]: manual.html#Color.Selection..GTK.Only.
+[fontselect]: manual.html#Font.Selection..GTK.Only.
 
 ### 1.3 (29 Aug 2016)
 
@@ -92,8 +92,8 @@ Changes:
 * New [optionselect][] dialog for checkbox option groups.
 
 [gtDialog 1.1]: https://github.com/orbitalquark/gtdialog/archive/gtdialog_1.1.zip
-[Inputboxes]: https://orbitalquark.github.io/gtdialog/manual.html#Inputboxes
-[optionselect]: https://orbitalquark.github.io/gtdialog/manual.html#Option.Selection
+[Inputboxes]: manual.html#Inputboxes
+[optionselect]: manual.html#Option.Selection
 
 ### 1.0 (20 Apr 2013)
 
