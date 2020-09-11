@@ -40,7 +40,7 @@
 #elif _WIN32
 #include <windows.h>
 #endif
-#include <cdk.h>
+#include <cdk/cdk.h>
 #endif
 
 #include "gtdialog.h"
