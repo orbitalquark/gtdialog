@@ -1,4 +1,4 @@
-# gtDialog
+## Introduction
 
 gtDialog is a cross-platform application for creating interactive dialogs from
 either the command line or from an application. It is written completely in C

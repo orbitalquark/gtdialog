@@ -48,29 +48,25 @@ uninstall: ; rm $(bin_dir)/gtdialog*
 
 # Documentation.
 
-doc: manual
-manual: doc/*.md *.md | doc/bombay
-	doc/bombay -d doc -t doc --title gtDialog $^
-cleandoc: ; rm -f doc/manual.html
+docs: docs/index.md $(wildcard docs/*.md) | docs/_layouts/default.html
+	for file in $(basename $^); do \
+		cat $| | docs/fill_layout.lua $$file.md > $$file.html; \
+	done
+docs/index.md: README.md ; sed 's/^\# gtDialog/## Introduction/;' $< > $@
+cleandoc: ; rm -f docs/*.html docs/index.md
 
 # Package.
 
-basedir = gtdialog_$(shell grep '^\#\#' CHANGELOG.md | head -1 | \
+basedir = gtdialog_$(shell grep '^\#\#\#' docs/changelog.md | head -1 | \
                            cut -d ' ' -f 2)
 
-release: doc
-	hg archive $(basedir)
-	rm $(basedir)/.hg*
-	cp -rL doc $(basedir)
-	zip -r /tmp/$(basedir).zip $(basedir) && rm -r $(basedir)
-	gpg -ab /tmp/$(basedir).zip
+ifneq (, $(shell hg summary 2>/dev/null))
+  archive = hg archive -X ".hg*" $(1)
+else
+  archive = git archive HEAD --prefix $(1)/ | tar -xf -
+endif
 
-# External dependencies.
-
-bombay_zip = bombay.zip
-
-$(bombay_zip):
-	wget "http://foicica.com/hg/bombay/archive/tip.zip" && mv tip.zip $@
-doc/bombay: | $(bombay_zip)
-	mkdir $(notdir $@) && unzip -d $(notdir $@) $| && \
-		mv $(notdir $@)/*/* $(dir $@)
+release: docs
+	$(call archive,$(basedir))
+	cp -rL docs $(basedir)
+	zip -r $(basedir).zip $(basedir) && rm -r $(basedir) && gpg -ab $(basedir).zip
