@@ -6,9 +6,9 @@
 
 * `gtdialog msgbox` *`args`*: A generic message box with custom button labels.
 * `gtdialog ok-msgbox` *`args`*: Identical to `msgbox`, but with
-  [localized](#Localization) "Ok" and "Cancel" buttons.
+  [localized](#localization) "Ok" and "Cancel" buttons.
 * `gtdialog yesno-msgbox` *`args`*: Identical to `msgbox`, but with
-  [localized](#Localization) "Yes", "No", and "Cancel" buttons.
+  [localized](#localization) "Yes", "No", and "Cancel" buttons.
 
 **Arguments**
 
@@ -61,7 +61,7 @@ canceled the dialog.
 * `gtdialog inputbox` *`args`*: A one line input box with custom button labels.
   An input box may have multiple entry boxes.
 * `gtdialog standard-inputbox` *`args`*: Identical to inputbox, but with
-  [localized](#Localization) "Ok" and "Cancel" buttons.
+  [localized](#localization) "Ok" and "Cancel" buttons.
 * `gtdialog secure-inputbox` *`args`*: Identical to inputbox, but input is
   masked.
 * `gtdialog secure-standard-inputbox` *`args`*: Identical to standard-inputbox,
@@ -248,7 +248,7 @@ Stop button was pressed. Otherwise it returns nothing.
 * `gtdialog dropdown` *`args`*: A drop down list of items to select from with
   custom button labels.
 * `gtdialog standard-dropdown` *`args`*: Identical to drop down, but with
-  [localized](#Localization) "Ok" and "Cancel" buttons.
+  [localized](#localization) "Ok" and "Cancel" buttons.
 
 **Arguments**
 

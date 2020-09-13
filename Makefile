@@ -55,4 +55,4 @@ docs: docs/index.md $(wildcard docs/*.md) | docs/_layouts/default.html
 docs/index.md: README.md
 	sed 's/^\# [[:alpha:]]\+/## Introduction/;' $< > $@
 	sed -i 's|https://[[:alpha:]]\+\.github\.io/[[:alpha:]]\+/||;' $@
-cleandoc: ; rm -f docs/*.html docs/index.md
+cleandocs: ; rm -f docs/*.html docs/index.md
