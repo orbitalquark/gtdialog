@@ -1,5 +1,7 @@
 ## Changelog
 
+[Atom Feed](https://github.com/orbitalquark/gtdialog/releases.atom)
+
 ### 1.5 (?)
 
 Download:

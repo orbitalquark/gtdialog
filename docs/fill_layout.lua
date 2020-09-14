@@ -7,8 +7,9 @@
 -- anchors, but ignore the actual TOC.
 local p = io.popen('markdown -f toc -T ' .. arg[1])
 local html = p:read('*a'):match('^.-\n</ul>\n(.+)$')
-html = html:gsub('id="([^"]+)"', function(id)
-  return string.format('id="%s"', id:gsub('%p+', '-'):gsub('%-$', ''):lower())
+html = html:gsub('<h(%d) id="([^"]+)"', function(n, id)
+  id = id:gsub('%p+', '-'):gsub('%-$', ''):lower():gsub('^l%-', '')
+  return string.format('<h%d id="%s"', n, id)
 end)
 p:close()
 
