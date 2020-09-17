@@ -53,6 +53,6 @@ docs: docs/index.md $(wildcard docs/*.md) | docs/_layouts/default.html
 		cat $| | docs/fill_layout.lua $$file.md > $$file.html; \
 	done
 docs/index.md: README.md
-	sed 's/^\# [[:alpha:]]\+/## Introduction/;' $< > $@
-	sed -i 's|https://[[:alpha:]]\+\.github\.io/[[:alpha:]]\+/||;' $@
+	sed -e 's/^\# [[:alpha:]]\+/## Introduction/;' -e \
+		's|https://[[:alpha:]]\+\.github\.io/[[:alpha:]]\+/||;' $< > $@
 cleandocs: ; rm -f docs/*.html docs/index.md
