@@ -18,6 +18,8 @@ Changes:
 * The C library can use the [progressbar][] dialog with a callback function.
 * Implemented [progressbar][] dialog in curses, but only via C library.
 * Changed the optionselect dialog's `--informative-text` option to `--text`.
+* Extremely large filteredlists (> 10000 items) filter on a keypress timeout in
+  the GUI.
 
 [gtDialog 1.5]: https://github.com/orbitalquark/gtdialog/archive/gtdialog_1.5.zip
 [progressbar]: manual.html#progressbar

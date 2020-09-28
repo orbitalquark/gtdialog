@@ -47,6 +47,7 @@
 
 #if GTK
 static GtkWindow *parent;
+static int timeout_source = -1;
 #endif
 static char *(*progressbar_cb)(void *);
 static void *progressbar_cb_userdata;
@@ -140,17 +141,32 @@ static void close_dropdown(GtkWidget *dropdown, gpointer userdata) {
   g_signal_emit_by_name(userdata, "response", RESPONSE_CHANGE);
 }
 
-/** Signal for a keypress in the filteredlist entry. */
-static gboolean entry_keypress(
-  GtkWidget *entry, GdkEventKey *event, gpointer userdata)
-{
+/** Filters the list. */
+static int filter_list(gpointer userdata) {
   GtkTreeView *view = GTK_TREE_VIEW(userdata);
   GtkTreeModel *model = gtk_tree_view_get_model(view);
   gtk_tree_model_filter_refilter(GTK_TREE_MODEL_FILTER(model));
   GtkTreeIter iter;
   if (gtk_tree_model_get_iter_first(model, &iter))
     gtk_tree_selection_select_iter(gtk_tree_view_get_selection(view), &iter);
+  timeout_source = -1;
   return FALSE;
+}
+
+/**
+ * Signal for a keypress in the filteredlist entry.
+ * When the list is sufficiently large, filter on a timeout.
+ */
+static gboolean entry_keypress(
+  GtkWidget *entry, GdkEventKey *event, gpointer userdata)
+{
+  if (timeout_source != -1) g_source_remove(timeout_source);
+  GtkTreeView *view = GTK_TREE_VIEW(userdata);
+  GtkTreeModel *model = gtk_tree_view_get_model(view);
+  if (gtk_tree_model_iter_n_children(model, NULL) > 10000)
+    timeout_source = g_timeout_add(100, filter_list, userdata);
+  else
+    filter_list(userdata);
 }
 
 /**
