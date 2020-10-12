@@ -129,8 +129,6 @@ string. You are responsible for calling `free()` on the string returned by
 
 ## Contribute
 
-gtDialog is [open source][]. Feel free to report bugs and submit patches either
-to the [mailing list][] or to me personally (mitchell.att.foicica.com).
+gtDialog is [open source][]. Feel free to report bugs and submit patches.
 
 [open source]: https://github.com/orbitalquark/gtdialog
-[mailing list]: https://foicica.com/lists
