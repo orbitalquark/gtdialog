@@ -403,8 +403,6 @@ the user canceled the dialog.
 **Arguments**
 
 * `--title str`: The dialog's title text.
-* `--string-output`: Output the names of selected buttons/items or exit codes
-  instead of button/item indexes or exit code numbers.
 * `--no-newline`: Do not output the default trailing newline.
 * `--width int`: Manually set the width of the dialog in pixels if possible.
 * `--height int`: Manually set the height of the dialog in pixels if possible.
