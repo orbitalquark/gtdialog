@@ -1,4 +1,4 @@
-# Copyright 2009-2020 Mitchell.
+# Copyright 2009-2021 Mitchell.
 
 CC = gcc
 PREFIX ?= /usr/local
@@ -49,9 +49,7 @@ uninstall: ; rm $(bin_dir)/gtdialog*
 # Documentation.
 
 docs: docs/index.md $(wildcard docs/*.md) | docs/_layouts/default.html
-	for file in $(basename $^); do \
-		cat $| | docs/fill_layout.lua $$file.md > $$file.html; \
-	done
+	for file in $(basename $^); do cat $| | docs/fill_layout.lua $$file.md > $$file.html; done
 docs/index.md: README.md
 	sed -e 's/^\# [[:alpha:]]\+/## Introduction/;' -e \
 		's|https://[[:alpha:]]\+\.github\.io/[[:alpha:]]\+/||;' $< > $@

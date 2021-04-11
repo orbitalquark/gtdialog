@@ -10,16 +10,15 @@ Download:
 
 Bugfixes:
 
-* Workaround `--select-only-directories` in the curses version by returning only
-  the directory of the file selected.
+* Workaround `--select-only-directories` in the curses version by returning only the directory
+  of the file selected.
 
 Changes:
 
 * The C library can use the [progressbar][] dialog with a callback function.
 * Implemented [progressbar][] dialog in curses, but only via C library.
 * Changed the optionselect dialog's `--informative-text` option to `--text`.
-* Extremely large filteredlists (> 10000 items) filter on a keypress timeout in
-  the GUI.
+* Extremely large filteredlists (> 10000 items) filter on a keypress timeout in the GUI.
 
 [gtDialog 1.5]: https://github.com/orbitalquark/gtdialog/archive/gtdialog_1.5.zip
 [progressbar]: manual.html#progressbar
@@ -56,9 +55,8 @@ Bugfixes:
 
 Changes:
 
-* The C library's `gtdialog_type()` function now returns `GTDIALOG_UNKNOWN`
-  instead of `-1` for an unrecognized dialog type string; `GTDialogType`
-  enumerations have changed internally.
+* The C library's `gtdialog_type()` function now returns `GTDIALOG_UNKNOWN` instead of `-1`
+  for an unrecognized dialog type string; `GTDialogType` enumerations have changed internally.
 
 [gtDialog 1.3]: https://github.com/orbitalquark/gtdialog/archive/gtdialog_1.3.zip
 

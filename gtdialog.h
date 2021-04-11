@@ -3,7 +3,7 @@
  *
  * The MIT License
  *
- * Copyright (c) 2009-2020 Mitchell
+ * Copyright (c) 2009-2021 Mitchell
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -64,29 +64,27 @@ void gtdialog_set_parent(GtkWindow *parent);
 
 /**
  * Sets the callback function used for progressbar dialogs.
- * @param callback Function to call to do some work. It must return either a
- *   newly allocated string of the form "num str\n", where num is integer
- *   progress between 0 and 100 and str is optional progress display text, or
- *   it must return `NULL`, signaling work is complete. The returned string will
- *   be freed by the caller.
+ * @param callback Function to call to do some work. It must return either a newly allocated
+ *   string of the form "num str\n", where num is integer progress between 0 and 100 and str is
+ *   optional progress display text, or it must return `NULL`, signaling work is complete. The
+ *   returned string will be freed by the caller.
  * @param data Optional data passed to the callback function.
  */
 void gtdialog_set_progressbar_callback(char *(*f)(void *), void *data);
 
 /**
  * Returns the GTDialogType for the given type string.
- * @param type The string dialog type. Acceptable types are "msgbox",
- *   "ok-msgbox", "yesno-msgbox", "inputbox", "standard-inputbox",
- *   "secure-inputbox", "secure-standard-inputbox", "fileselect", "filesave",
- *   "textbox", "progressbar", "dropdown", "standard-dropdown", "filteredlist",
+ * @param type The string dialog type. Acceptable types are "msgbox", "ok-msgbox", "yesno-msgbox",
+ *   "inputbox", "standard-inputbox", "secure-inputbox", "secure-standard-inputbox", "fileselect",
+ *   "filesave", "textbox", "progressbar", "dropdown", "standard-dropdown", "filteredlist",
  *   "optionselect", "colorselect", and "fontselect".
  * @return GTDialogType or GTDIALOG_UNKNOWN
  */
 GTDialogType gtdialog_type(const char *type);
 
 /**
- * Creates, displays, and returns the result from a gtdialog of the given type
- * from the given set of parameters.
+ * Creates, displays, and returns the result from a gtdialog of the given type from the given
+ * set of parameters.
  * The string returned must be freed when finished.
  * @param type The GTDialogType type.
  * @param narg The number of parameters in *args*.

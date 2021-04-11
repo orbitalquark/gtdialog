@@ -3,7 +3,7 @@
  *
  * The MIT License
  *
- * Copyright (c) 2009-2020 Mitchell
+ * Copyright (c) 2009-2021 Mitchell
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -56,8 +56,7 @@ static CDKENTRY *focused_entry;
 #endif
 static int RESPONSE_DELETE = -1, RESPONSE_TIMEOUT = 0, RESPONSE_CHANGE = 4;
 // Options used by other functions.
-static int indeterminate, stoppable, string_output, output_col = 1,
-  search_col = 1;
+static int indeterminate, stoppable, string_output, output_col = 1, search_col = 1;
 
 // Default button labels.
 #if GTK
@@ -76,20 +75,16 @@ static int indeterminate, stoppable, string_output, output_col = 1,
 
 #if GTK
 // Translate GTK 2.x API to GTK 3.0 for compatibility.
-#if GTK_CHECK_VERSION(3,0,0)
+#if GTK_CHECK_VERSION(3, 0, 0)
 #define gtk_combo_box_new_text gtk_combo_box_text_new
-#define gtk_combo_box_append_text(w,t) \
-  gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(w),t)
-#define gtk_combo_box_get_active_text(w) \
-  gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(w))
+#define gtk_combo_box_append_text(w, t) gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(w), t)
+#define gtk_combo_box_get_active_text(w) gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(w))
 #endif
 #endif
 #define copy(s) strcpy(malloc(strlen(s) + 1), s)
 
 #if GTK
-void gtdialog_set_parent(GtkWindow *window) {
-  parent = window;
-}
+void gtdialog_set_parent(GtkWindow *window) { parent = window; }
 #endif
 
 void gtdialog_set_progressbar_callback(char *(*f)(void *), void *userdata) {
@@ -157,9 +152,7 @@ static int filter_list(gpointer userdata) {
  * Signal for a keypress in the filteredlist entry.
  * When the list is sufficiently large, filter on a timeout.
  */
-static gboolean entry_keypress(
-  GtkWidget *entry, GdkEventKey *event, gpointer userdata)
-{
+static gboolean entry_keypress(GtkWidget *entry, GdkEventKey *event, gpointer userdata) {
   if (timeout_source != -1) g_source_remove(timeout_source);
   GtkTreeView *view = GTK_TREE_VIEW(userdata);
   GtkTreeModel *model = gtk_tree_view_get_model(view);
@@ -187,8 +180,7 @@ static void process_progressbar_input(char *input, gpointer userdata) {
   while (!isspace(*p)) p++;
   *p = '\0', p[strlen(p + 1)] = '\0'; // chomp '\n'
   if (!indeterminate)
-    gtk_progress_bar_set_fraction(
-      GTK_PROGRESS_BAR(progressbar), 0.01 * atoi(input));
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progressbar), 0.01 * atoi(input));
   else
     gtk_progress_bar_pulse(GTK_PROGRESS_BAR(progressbar));
   if (*(p + 1)) {
@@ -203,22 +195,21 @@ static void process_progressbar_input(char *input, gpointer userdata) {
       else
         gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), p + 1);
       g_list_free(children2);
-    } else gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), p + 1);
+    } else
+      gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), p + 1);
   }
   g_list_free(children);
 }
 
 /** Signal for when stdin is available for the progressbar. */
-static gboolean read_stdin(
-  GIOChannel *channel, GIOCondition condition, gpointer userdata)
-{
+static gboolean read_stdin(GIOChannel *channel, GIOCondition condition, gpointer userdata) {
   GtkWidget *dialog = (GtkWidget *)userdata;
   if (condition == G_IO_IN) {
     char *input;
-    if (g_io_channel_read_line(channel, &input, NULL, NULL, NULL) ==
-        G_IO_STATUS_NORMAL)
+    if (g_io_channel_read_line(channel, &input, NULL, NULL, NULL) == G_IO_STATUS_NORMAL)
       process_progressbar_input(input, userdata), free(input);
-  } else g_signal_emit_by_name(dialog, "response", 0); // 1 is for Stop pressed
+  } else
+    g_signal_emit_by_name(dialog, "response", 0); // 1 is for Stop pressed
   return !(condition & G_IO_HUP);
 }
 
@@ -230,8 +221,7 @@ static gboolean read_stdin(
 static gboolean call_progressbar_callback(gpointer userdata) {
   if (!progressbar_cb) return FALSE;
   char *input = progressbar_cb(progressbar_cb_userdata);
-  if (!input)
-    return (g_signal_emit_by_name((GtkWidget *)userdata, "response", 0), FALSE);
+  if (!input) return (g_signal_emit_by_name((GtkWidget *)userdata, "response", 0), FALSE);
   process_progressbar_input(input, userdata);
   free(input);
   while (gtk_events_pending()) gtk_main_iteration();
@@ -244,23 +234,21 @@ static gboolean call_progressbar_callback(gpointer userdata) {
  * characters.
  */
 static void list_foreach(
-  GtkTreeModel *model, GtkTreePath *path, GtkTreeIter *iter, gpointer userdata)
-{
+  GtkTreeModel *model, GtkTreePath *path, GtkTreeIter *iter, gpointer userdata) {
   char *value;
   if (!string_output) {
     GtkTreeModelFilter *filter = GTK_TREE_MODEL_FILTER(model);
     path = gtk_tree_model_filter_convert_path_to_child_path(filter, path);
     value = gtk_tree_path_to_string(path);
     gtk_tree_path_free(path);
-  } else gtk_tree_model_get(model, iter, output_col - 1, &value, -1);
+  } else
+    gtk_tree_model_get(model, iter, output_col - 1, &value, -1);
   g_string_append_printf((GString *)userdata, "%s\n", value);
   free(value);
 }
 
 /** Signal for the 'enter' key being pressed in the filteredlist view. */
-static gboolean list_keypress(
-  GtkWidget *treeview, GdkEventKey *event, gpointer userdata)
-{
+static gboolean list_keypress(GtkWidget *treeview, GdkEventKey *event, gpointer userdata) {
   if (event->keyval == 0xff0d) // return key
     return (g_signal_emit_by_name(userdata, "response", 1), TRUE);
   return FALSE;
@@ -268,16 +256,12 @@ static gboolean list_keypress(
 
 /** Signal for a row being activated in the filteredlist view. */
 static gboolean list_select(
-  GtkTreeView *treeview, GtkTreePath *path, GtkTreeViewColumn *column,
-  gpointer userdata)
-{
+  GtkTreeView *treeview, GtkTreePath *path, GtkTreeViewColumn *column, gpointer userdata) {
   return (g_signal_emit_by_name(userdata, "response", 1), TRUE);
 }
 
 /** Function for filtering filterdlist items based on user input. */
-static gboolean list_visible(
-  GtkTreeModel *model, GtkTreeIter *iter, gpointer userdata)
-{
+static gboolean list_visible(GtkTreeModel *model, GtkTreeIter *iter, gpointer userdata) {
   const char *entry_text = gtk_entry_get_text(GTK_ENTRY(userdata));
   if (strlen(entry_text) == 0) return TRUE;
   char *text = g_utf8_strdown(entry_text, -1);
@@ -340,12 +324,11 @@ static int wrap(char *str, int w, char ***plines) {
 }
 
 /** Signal for the 'tab' and 'shift+tab' keys being pressed. */
-static int entries_tab(
-  EObjectType cdkType, void *object, void *data, chtype key)
-{
+static int entries_tab(EObjectType cdkType, void *object, void *data, chtype key) {
   CDKENTRY *entry = (CDKENTRY *)object, **entries = (CDKENTRY **)data;
   int i = 0, len = 0;
-  for (len = 0; entries[len]; len++) if (entries[len] == entry) i = len;
+  for (len = 0; entries[len]; len++)
+    if (entries[len] == entry) i = len;
   if (key == KEY_TAB || key == KEY_DOWN)
     focused_entry = entries[i + 1];
   else
@@ -354,9 +337,7 @@ static int entries_tab(
 }
 
 /** Signal for the 'tab' and 'shift+tab' keys being pressed. */
-static int buttonbox_tab(
-  EObjectType cdkType, void *object, void *data, chtype key)
-{
+static int buttonbox_tab(EObjectType cdkType, void *object, void *data, chtype key) {
   return (injectCDKButtonbox((CDKBUTTONBOX *)data, key), TRUE);
 }
 
@@ -399,9 +380,7 @@ static char *strdown(char *s) {
 }
 
 /** Signal for a keypress in the filteredlist entry. */
-static int entry_keypress(
-  EObjectType cdkType, void *object, void *data, chtype key)
-{
+static int entry_keypress(EObjectType cdkType, void *object, void *data, chtype key) {
   Model *model = (Model *)data;
   char *entry_text = getCDKEntryValue((CDKENTRY *)object);
   if (strlen(entry_text) > 0) {
@@ -423,8 +402,8 @@ static int entry_keypress(
     free(text);
     CDKfreeStrings(tokens);
     setCDKScrollItems(model->scrolled, model->filtered_rows, row, FALSE);
-  } else setCDKScrollItems(
-    model->scrolled, model->rows, model->len / model->ncols, FALSE);
+  } else
+    setCDKScrollItems(model->scrolled, model->rows, model->len / model->ncols, FALSE);
   HasFocusObj(ObjOf(model->scrolled)) = TRUE; // needed to draw highlight
   eraseCDKScroll(model->scrolled); // drawCDKScroll does not completely redraw
   drawCDKScroll(model->scrolled, TRUE), drawCDKEntry(model->entry, FALSE);
@@ -452,8 +431,7 @@ static unsigned int utf8charlen(unsigned char ch) {
 /** Returns the number of characters in the given UTF-8 string. */
 static size_t utf8strlen(const char *s) {
   size_t len = strlen(s), utf8len = 0;
-  for (size_t i = 0; i < len; i += utf8charlen((unsigned char)(s[i])))
-    utf8len++;
+  for (size_t i = 0; i < len; i += utf8charlen((unsigned char)(s[i]))) utf8len++;
   return utf8len;
 }
 #endif
@@ -502,9 +480,7 @@ static char **item_rows(char **cols, int ncols, char **items, int len) {
 }
 
 /** Signal for a scrolling keypress in the filteredlist entry. */
-static int scrolled_key(
-  EObjectType cdkType, void *object, void *data, chtype key)
-{
+static int scrolled_key(EObjectType cdkType, void *object, void *data, chtype key) {
   HasFocusObj(ObjOf((CDKSCROLL *)data)) = TRUE; // needed to draw highlight
   injectCDKScroll((CDKSCROLL *)data, key);
   HasFocusObj(ObjOf((CDKSCROLL *)data)) = FALSE;
@@ -519,18 +495,17 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
 
   // Dialog options.
-  int editable = FALSE, exit_onchange = FALSE, floating = FALSE,
-    focus_textbox = FALSE, font_size = 12, height = -1, no_create_dirs = FALSE,
-    no_newline = FALSE, no_show = FALSE, percent = 0, select_multiple = FALSE,
-    select_only_dirs = FALSE, select = 0, selected = FALSE, timeout_len = 0,
-    width = -1;
+  int editable = FALSE, exit_onchange = FALSE, floating = FALSE, focus_textbox = FALSE,
+      font_size = 12, height = -1, no_create_dirs = FALSE, no_newline = FALSE, no_show = FALSE,
+      percent = 0, select_multiple = FALSE, select_only_dirs = FALSE, select = 0, selected = FALSE,
+      timeout_len = 0, width = -1;
   indeterminate = FALSE, stoppable = FALSE, string_output = FALSE;
   output_col = 1, search_col = 1;
-  const char *buttons[3] = {NULL, NULL, NULL}, **cols = NULL, *color = NULL,
-    *font_name = NULL, *font_style = "", *icon = NULL, *icon_file = NULL,
-    *info_text = NULL, **info_texts = NULL, **items = NULL, *scroll_to = "top",
-    **selects = NULL, *text = NULL, **texts = NULL, *text_file = NULL,
-    *title = "gtdialog", *with_dir = NULL, *with_file = NULL;
+  const char *buttons[3] = {NULL, NULL, NULL}, **cols = NULL, *color = NULL, *font_name = NULL,
+             *font_style = "", *icon = NULL, *icon_file = NULL, *info_text = NULL,
+             **info_texts = NULL, **items = NULL, *scroll_to = "top", **selects = NULL,
+             *text = NULL, **texts = NULL, *text_file = NULL, *title = "gtdialog", *with_dir = NULL,
+             *with_file = NULL;
   // Other variables.
   int ncols = 0, nrows = 0, len = 0;
 #if GTK
@@ -551,8 +526,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     buttons[0] = STR_YES, buttons[1] = STR_NO, buttons[2] = STR_CANCEL;
   else if (type == GTDIALOG_INPUTBOX || type == GTDIALOG_SECURE_INPUTBOX)
     buttons[0] = STR_OK;
-  else if (type == GTDIALOG_STANDARD_INPUTBOX ||
-           type == GTDIALOG_SECURE_STANDARD_INPUTBOX)
+  else if (type == GTDIALOG_STANDARD_INPUTBOX || type == GTDIALOG_SECURE_STANDARD_INPUTBOX)
     buttons[0] = STR_OK, buttons[1] = STR_CANCEL;
 #if CURSES
   else if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
@@ -584,19 +558,16 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   const char *arg = args[i++];
   while (arg && i <= narg) {
     if (strcmp(arg, "--button1") == 0) {
-      if (type == GTDIALOG_MSGBOX || type == GTDIALOG_INPUTBOX ||
-          type == GTDIALOG_TEXTBOX || type == GTDIALOG_DROPDOWN ||
-          type == GTDIALOG_FILTEREDLIST || type == GTDIALOG_OPTIONSELECT)
+      if (type == GTDIALOG_MSGBOX || type == GTDIALOG_INPUTBOX || type == GTDIALOG_TEXTBOX ||
+        type == GTDIALOG_DROPDOWN || type == GTDIALOG_FILTEREDLIST || type == GTDIALOG_OPTIONSELECT)
         buttons[0] = args[i++];
     } else if (strcmp(arg, "--button2") == 0) {
-      if (type == GTDIALOG_MSGBOX || type == GTDIALOG_INPUTBOX ||
-          type == GTDIALOG_TEXTBOX || type == GTDIALOG_DROPDOWN ||
-          type == GTDIALOG_FILTEREDLIST || type == GTDIALOG_OPTIONSELECT)
+      if (type == GTDIALOG_MSGBOX || type == GTDIALOG_INPUTBOX || type == GTDIALOG_TEXTBOX ||
+        type == GTDIALOG_DROPDOWN || type == GTDIALOG_FILTEREDLIST || type == GTDIALOG_OPTIONSELECT)
         buttons[1] = args[i++];
     } else if (strcmp(arg, "--button3") == 0) {
-      if (type == GTDIALOG_MSGBOX || type == GTDIALOG_INPUTBOX ||
-          type == GTDIALOG_TEXTBOX || type == GTDIALOG_DROPDOWN ||
-          type == GTDIALOG_FILTEREDLIST || type == GTDIALOG_OPTIONSELECT)
+      if (type == GTDIALOG_MSGBOX || type == GTDIALOG_INPUTBOX || type == GTDIALOG_TEXTBOX ||
+        type == GTDIALOG_DROPDOWN || type == GTDIALOG_FILTEREDLIST || type == GTDIALOG_OPTIONSELECT)
         buttons[2] = args[i++];
     } else if (strcmp(arg, "--color") == 0) {
       if (type == GTDIALOG_COLORSELECT) color = args[i++];
@@ -608,11 +579,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     } else if (strcmp(arg, "--editable") == 0) {
       if (type == GTDIALOG_TEXTBOX) editable = TRUE;
     } else if (strcmp(arg, "--exit-onchange") == 0) {
-      if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN)
-        exit_onchange = TRUE;
+      if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN) exit_onchange = TRUE;
     } else if (strcmp(arg, "--float") == 0) {
-      if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
-          type != GTDIALOG_PROGRESSBAR) floating = TRUE;
+      if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE && type != GTDIALOG_PROGRESSBAR)
+        floating = TRUE;
     } else if (strcmp(arg, "--focus-textbox") == 0) {
       if (type == GTDIALOG_TEXTBOX) focus_textbox = TRUE;
     } else if (strcmp(arg, "--font-name") == 0) {
@@ -628,19 +598,15 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       int h = atoi(args[i++]);
       if (h > 0) height = h;
     } else if (strcmp(arg, "--icon") == 0) {
-      if (type >= GTDIALOG_MSGBOX && type <= GTDIALOG_YESNO_MSGBOX)
-        icon = args[i++];
+      if (type >= GTDIALOG_MSGBOX && type <= GTDIALOG_YESNO_MSGBOX) icon = args[i++];
     } else if (strcmp(arg, "--icon-file") == 0) {
-      if (type >= GTDIALOG_MSGBOX && type <= GTDIALOG_YESNO_MSGBOX)
-        icon_file = args[i++];
+      if (type >= GTDIALOG_MSGBOX && type <= GTDIALOG_YESNO_MSGBOX) icon_file = args[i++];
     } else if (strcmp(arg, "--indeterminate") == 0) {
       if (type == GTDIALOG_PROGRESSBAR) indeterminate = TRUE;
     } else if (strcmp(arg, "--informative-text") == 0) {
-      if (type < GTDIALOG_FILESELECT || type == GTDIALOG_TEXTBOX ||
-          type == GTDIALOG_FILTEREDLIST) {
+      if (type < GTDIALOG_FILESELECT || type == GTDIALOG_TEXTBOX || type == GTDIALOG_FILTEREDLIST) {
         info_text = args[i++];
-        if (type >= GTDIALOG_INPUTBOX &&
-            type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
+        if (type >= GTDIALOG_INPUTBOX && type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
           info_texts = &args[i], nrows = 0; // for multiple inputboxes, if any
           while (i < narg && strncmp(args[i], "--", 2) != 0) nrows++, i++;
         }
@@ -657,8 +623,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
     } else if (strcmp(arg, "--no-cancel") == 0) {
       if (type == GTDIALOG_OK_MSGBOX || type == GTDIALOG_STANDARD_INPUTBOX ||
-          type == GTDIALOG_SECURE_STANDARD_INPUTBOX ||
-          type == GTDIALOG_STANDARD_DROPDOWN)
+        type == GTDIALOG_SECURE_STANDARD_INPUTBOX || type == GTDIALOG_STANDARD_DROPDOWN)
         buttons[1] = NULL;
       else if (type == GTDIALOG_YESNO_MSGBOX)
         buttons[2] = NULL;
@@ -667,8 +632,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     } else if (strcmp(arg, "--no-newline") == 0) {
       no_newline = TRUE;
     } else if (strcmp(arg, "--no-show") == 0) {
-      if (type >= GTDIALOG_INPUTBOX &&
-          type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) no_show = TRUE;
+      if (type >= GTDIALOG_INPUTBOX && type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) no_show = TRUE;
     } else if (strcmp(arg, "--output-column") == 0) {
       if (type == GTDIALOG_FILTEREDLIST) {
         output_col = atoi(args[i++]);
@@ -689,8 +653,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         if (search_col < 1) search_col = 1;
       }
     } else if (strcmp(arg, "--select-multiple") == 0) {
-      if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILTEREDLIST)
-        select_multiple = TRUE;
+      if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILTEREDLIST) select_multiple = TRUE;
     } else if (strcmp(arg, "--select-only-directories") == 0) {
       if (type == GTDIALOG_FILESELECT) select_only_dirs = TRUE;
     } else if (strcmp(arg, "--select") == 0) {
@@ -708,24 +671,22 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       string_output = TRUE;
     } else if (strcmp(arg, "--text") == 0) {
       text = args[i++];
-      if (type >= GTDIALOG_INPUTBOX &&
-          type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
+      if (type >= GTDIALOG_INPUTBOX && type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
         texts = &args[i - 1], len = 1; // for multiple inputboxes, if any
         while (i < narg && strncmp(args[i], "--", 2) != 0) i++, len++;
       }
     } else if (strcmp(arg, "--text-from-file") == 0) {
       if (type == GTDIALOG_TEXTBOX) text_file = args[i++];
     } else if (strcmp(arg, "--timeout") == 0) {
-      if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
-          type != GTDIALOG_PROGRESSBAR) timeout_len = atoi(args[i++]);
+      if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE && type != GTDIALOG_PROGRESSBAR)
+        timeout_len = atoi(args[i++]);
     } else if (strcmp(arg, "--title") == 0) {
       title = args[i++];
     } else if (strcmp(arg, "--width") == 0) {
       int w = atoi(args[i++]);
       if (w > 0) width = w;
     } else if (strcmp(arg, "--with-directory") == 0) {
-      if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
-        with_dir = args[i++];
+      if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE) with_dir = args[i++];
     } else if (strcmp(arg, "--with-extension") == 0) {
       if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE) {
 #if GTK
@@ -744,18 +705,17 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         }
       }
     } else if (strcmp(arg, "--with-file") == 0) {
-      if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE)
-        with_file = args[i++];
+      if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE) with_file = args[i++];
     }
     arg = args[i++];
   }
   if (output_col > ncols) output_col = ncols;
   if (search_col > ncols) search_col = ncols;
 
-  // Create dialog.
+    // Create dialog.
 #if GTK
-  GtkWidget *dialog, *entry, *entries[nrows], *textview, *progressbar,
-    *combobox, *treeview, *options[nrows];
+  GtkWidget *dialog, *entry, *entries[nrows], *textview, *progressbar, *combobox, *treeview,
+    *options[nrows];
   GtkListStore *list;
 #elif CURSES
   int cursor = curs_set(1); // enable cursor
@@ -767,16 +727,14 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   CDKITEMLIST *combobox;
   CDKBUTTONBOX *buttonbox;
   CDKSCROLL *scrolled;
-  Model model = {
-    ncols, search_col, (char **)items, len, NULL, 0, NULL, NULL, NULL
-  };
+  Model model = {ncols, search_col, (char **)items, len, NULL, 0, NULL, NULL, NULL};
   CDKSELECTION *options;
   CDKFSELECT *fileselect;
   char cwd[FILENAME_MAX];
   getcwd(cwd, FILENAME_MAX);
 #endif
-  if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
-      type != GTDIALOG_COLORSELECT && type != GTDIALOG_FONTSELECT) {
+  if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE && type != GTDIALOG_COLORSELECT &&
+    type != GTDIALOG_FONTSELECT) {
 #if GTK
     dialog = gtk_dialog_new();
     gtk_window_set_title(GTK_WINDOW(dialog), title);
@@ -794,18 +752,16 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     if (type != GTDIALOG_PROGRESSBAR || stoppable) {
 #if GTK
       for (i = 3; i > 0; i--)
-        if (buttons[i - 1])
-          gtk_dialog_add_button(GTK_DIALOG(dialog), buttons[i - 1], i);
+        if (buttons[i - 1]) gtk_dialog_add_button(GTK_DIALOG(dialog), buttons[i - 1], i);
       gtk_dialog_set_default_response(GTK_DIALOG(dialog), 1);
 #elif CURSES
       int nbuttons = 0;
-      for (i = 0; i < 3; i++) if (buttons[i]) nbuttons++;
+      for (i = 0; i < 3; i++)
+        if (buttons[i]) nbuttons++;
       char *rtl_buttons[3] = {NULL, NULL, NULL};
-      for (i = nbuttons; i > 0; i--)
-        rtl_buttons[nbuttons - i] = (char *)buttons[i - 1];
+      for (i = nbuttons; i > 0; i--) rtl_buttons[nbuttons - i] = (char *)buttons[i - 1];
       buttonbox = newCDKButtonbox(
-        dialog, 0, BOTTOM, 1, 0, "", 1, nbuttons, rtl_buttons, nbuttons,
-        A_REVERSE, TRUE, FALSE);
+        dialog, 0, BOTTOM, 1, 0, "", 1, nbuttons, rtl_buttons, nbuttons, A_REVERSE, TRUE, FALSE);
       setCDKButtonboxCurrentButton(buttonbox, nbuttons - 1);
 #endif
     }
@@ -822,7 +778,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         image = gtk_image_new_from_stock(icon, GTK_ICON_SIZE_DIALOG);
       else
         image = gtk_image_new_from_file(icon_file);
-#if GTK_CHECK_VERSION(3,0,0)
+#if GTK_CHECK_VERSION(3, 0, 0)
       gtk_widget_set_halign(image, GTK_ALIGN_CENTER);
       gtk_widget_set_valign(image, GTK_ALIGN_START);
 #else
@@ -833,15 +789,11 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       gtk_box_pack_start(GTK_BOX(hbox), vbox2, TRUE, TRUE, 0);
       vbox = vbox2;
     }
-    if (text &&
-        (type < GTDIALOG_INPUTBOX ||
-          type > GTDIALOG_SECURE_STANDARD_INPUTBOX) &&
-        type != GTDIALOG_TEXTBOX && type != GTDIALOG_PROGRESSBAR &&
-        type != GTDIALOG_FILTEREDLIST)
+    if (text && (type < GTDIALOG_INPUTBOX || type > GTDIALOG_SECURE_STANDARD_INPUTBOX) &&
+      type != GTDIALOG_TEXTBOX && type != GTDIALOG_PROGRESSBAR && type != GTDIALOG_FILTEREDLIST)
       gtk_box_pack_start(GTK_BOX(vbox), gtk_label_new(text), FALSE, TRUE, 5);
     if (info_text && type != GTDIALOG_PROGRESSBAR)
-      gtk_box_pack_start(
-        GTK_BOX(vbox), gtk_label_new(info_text), FALSE, TRUE, 5);
+      gtk_box_pack_start(GTK_BOX(vbox), gtk_label_new(info_text), FALSE, TRUE, 5);
 #endif
     if (type <= GTDIALOG_YESNO_MSGBOX) {
 #if CURSES
@@ -858,8 +810,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         free(lines);
       }
 #endif
-    } else if (type >= GTDIALOG_INPUTBOX &&
-               type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
+    } else if (type >= GTDIALOG_INPUTBOX && type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
 #if GTK
       if (nrows < 2) {
         // Single entry inputbox.
@@ -877,16 +828,13 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         for (i = 0; i < nrows; i++) {
           GtkWidget *label = gtk_label_new(info_texts[i]);
           entries[i] = gtk_entry_new();
-          if (i == nrows - 1)
-            gtk_entry_set_activates_default(GTK_ENTRY(entries[i]), TRUE);
+          if (i == nrows - 1) gtk_entry_set_activates_default(GTK_ENTRY(entries[i]), TRUE);
           if (type >= GTDIALOG_SECURE_INPUTBOX || no_show)
             gtk_entry_set_visibility(GTK_ENTRY(entries[i]), FALSE);
           if (i < len) gtk_entry_set_text(GTK_ENTRY(entries[i]), texts[i]);
-          gtk_table_attach(
-            GTK_TABLE(table), label, 0, 1, i, i + 1, GTK_FILL | GTK_SHRINK,
+          gtk_table_attach(GTK_TABLE(table), label, 0, 1, i, i + 1, GTK_FILL | GTK_SHRINK,
             GTK_FILL | GTK_SHRINK, 5, 0);
-          gtk_table_attach(
-            GTK_TABLE(table), entries[i], 1, 2, i, i + 1, GTK_FILL | GTK_EXPAND,
+          gtk_table_attach(GTK_TABLE(table), entries[i], 1, 2, i, i + 1, GTK_FILL | GTK_EXPAND,
             GTK_FILL | GTK_SHRINK, 5, 0);
         }
       }
@@ -895,8 +843,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       if (type >= GTDIALOG_SECURE_INPUTBOX || no_show) display = vHMIXED;
       if (nrows < 2) {
         // Single entry inputbox.
-        entry = newCDKEntry(
-          dialog, LEFT, TOP, (char *)title, (char *)info_text, A_NORMAL, '_',
+        entry = newCDKEntry(dialog, LEFT, TOP, (char *)title, (char *)info_text, A_NORMAL, '_',
           display, 0, 0, 100, FALSE, FALSE);
         bindCDKObject(vENTRY, entry, KEY_TAB, buttonbox_tab, buttonbox);
         bindCDKObject(vENTRY, entry, KEY_BTAB, buttonbox_tab, buttonbox);
@@ -904,10 +851,9 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       } else {
         // Multiple entry inputbox.
         for (i = 0; i < nrows; i++) {
-          entries[i] = newCDKEntry(
-            dialog, LEFT, (i == 0) ? TOP : i + 3,
-            (i == 0) ? (char *)title : NULL, (char *)info_texts[i], A_NORMAL,
-            '_', display, 0, 0, 100, FALSE, FALSE);
+          entries[i] =
+            newCDKEntry(dialog, LEFT, (i == 0) ? TOP : i + 3, (i == 0) ? (char *)title : NULL,
+              (char *)info_texts[i], A_NORMAL, '_', display, 0, 0, 100, FALSE, FALSE);
           BINDFN function = (i < nrows - 1) ? entries_tab : buttonbox_tab;
           void *data = (i < nrows - 1) ? entries : (void *)buttonbox;
           bindCDKObject(vENTRY, entries[i], KEY_TAB, function, data);
@@ -923,21 +869,18 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if GTK
       textview = gtk_text_view_new();
       gtk_text_view_set_editable(GTK_TEXT_VIEW(textview), editable);
-      if (!focus_textbox && !editable)
-        g_object_set(G_OBJECT(textview), "can-focus", FALSE, NULL);
+      if (!focus_textbox && !editable) g_object_set(G_OBJECT(textview), "can-focus", FALSE, NULL);
       GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
       gtk_container_add(GTK_CONTAINER(scrolled), textview);
       gtk_scrolled_window_set_policy(
-        GTK_SCROLLED_WINDOW(scrolled), GTK_POLICY_AUTOMATIC,
-        GTK_POLICY_AUTOMATIC);
+        GTK_SCROLLED_WINDOW(scrolled), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
       gtk_box_pack_start(GTK_BOX(vbox), scrolled, TRUE, TRUE, 5);
       if (font) gtk_widget_modify_font(textview, font);
       GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview));
       if (text) gtk_text_buffer_set_text(buffer, text, strlen(text));
 #elif CURSES
       EDisplayType display = editable ? vVIEWONLY : vMIXED;
-      textview = newCDKMentry(
-        dialog, LEFT, TOP, (char *)title, (char *)info_text, A_NORMAL, '_',
+      textview = newCDKMentry(dialog, LEFT, TOP, (char *)title, (char *)info_text, A_NORMAL, '_',
         display, 0, height - 8, height - 8, 0, FALSE, FALSE);
       if (text) setCDKMentryValue(textview, (char *)text);
 #endif
@@ -961,12 +904,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       if (strcmp(scroll_to, "bottom") == 0) {
         GtkTextView *view = GTK_TEXT_VIEW(textview);
         GtkTextBuffer *buffer = gtk_text_view_get_buffer(view);
-        gtk_text_view_scroll_mark_onscreen(
-          view, gtk_text_buffer_get_insert(buffer));
-      } else g_signal_emit_by_name(
-        G_OBJECT(textview), "move-cursor", GTK_MOVEMENT_BUFFER_ENDS, -1, 0);
-      if (selected)
-        g_signal_emit_by_name(G_OBJECT(textview), "select-all", TRUE);
+        gtk_text_view_scroll_mark_onscreen(view, gtk_text_buffer_get_insert(buffer));
+      } else
+        g_signal_emit_by_name(G_OBJECT(textview), "move-cursor", GTK_MOVEMENT_BUFFER_ENDS, -1, 0);
+      if (selected) g_signal_emit_by_name(G_OBJECT(textview), "select-all", TRUE);
 #elif CURSES
       if (strcmp(scroll_to, "top") == 0)
         injectCDKMentry(textview, KEY_HOME);
@@ -978,8 +919,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       progressbar = gtk_progress_bar_new();
       gtk_box_pack_start(GTK_BOX(vbox), progressbar, FALSE, TRUE, 5);
       if (!indeterminate && percent)
-        gtk_progress_bar_set_fraction(
-          GTK_PROGRESS_BAR(progressbar), 0.01 * percent);
+        gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progressbar), 0.01 * percent);
       else if (indeterminate)
         gtk_progress_bar_pulse(GTK_PROGRESS_BAR(progressbar));
       if (text) gtk_progress_bar_set_text(GTK_PROGRESS_BAR(progressbar), text);
@@ -989,25 +929,20 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if (LIBRARY && !_WIN32)
       tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
 #endif
-      progressbar = newCDKSlider(
-        dialog, LEFT, TOP, (char*)title, "", ' ' | A_REVERSE, 0, percent, 0,
-        100, 1, 2, FALSE, FALSE);
+      progressbar = newCDKSlider(dialog, LEFT, TOP, (char *)title, "", ' ' | A_REVERSE, 0, percent,
+        0, 100, 1, 2, FALSE, FALSE);
 #endif
-    } else if (type == GTDIALOG_DROPDOWN ||
-               type == GTDIALOG_STANDARD_DROPDOWN) {
+    } else if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN) {
 #if GTK
       combobox = gtk_combo_box_new_text();
       gtk_box_pack_start(GTK_BOX(vbox), combobox, FALSE, TRUE, 5);
       if (exit_onchange)
-        g_signal_connect(
-          G_OBJECT(combobox), "changed", G_CALLBACK(close_dropdown), dialog);
-      for (i = 0; i < len; i++)
-        gtk_combo_box_append_text(GTK_COMBO_BOX(combobox), items[i]);
+        g_signal_connect(G_OBJECT(combobox), "changed", G_CALLBACK(close_dropdown), dialog);
+      for (i = 0; i < len; i++) gtk_combo_box_append_text(GTK_COMBO_BOX(combobox), items[i]);
       gtk_combo_box_set_active(GTK_COMBO_BOX(combobox), select);
 #elif CURSES
       combobox = newCDKItemlist(
-        dialog, LEFT, TOP, (char *)title, (char *)info_text, (char **)items,
-        len, 0, FALSE, FALSE);
+        dialog, LEFT, TOP, (char *)title, (char *)info_text, (char **)items, len, 0, FALSE, FALSE);
 #endif
     } else if (type == GTDIALOG_FILTEREDLIST) {
       if (ncols == 0) return copy("Error: --columns not given.\n");
@@ -1019,16 +954,12 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       gtk_box_pack_start(GTK_BOX(vbox), scrolled, TRUE, TRUE, 0);
       treeview = gtk_tree_view_new();
       gtk_tree_view_set_enable_search(GTK_TREE_VIEW(treeview), TRUE);
-      g_signal_connect(
-        G_OBJECT(treeview), "key-press-event", G_CALLBACK(list_keypress),
-        dialog);
-      g_signal_connect(
-        G_OBJECT(treeview), "row-activated", G_CALLBACK(list_select), dialog);
+      g_signal_connect(G_OBJECT(treeview), "key-press-event", G_CALLBACK(list_keypress), dialog);
+      g_signal_connect(G_OBJECT(treeview), "row-activated", G_CALLBACK(list_select), dialog);
       for (i = 0; i < ncols; i++) {
         GtkCellRenderer *renderer = gtk_cell_renderer_text_new();
         GtkTreeViewColumn *treecol = NULL;
-        treecol = gtk_tree_view_column_new_with_attributes(
-          cols[i], renderer, "text", i, NULL);
+        treecol = gtk_tree_view_column_new_with_attributes(cols[i], renderer, "text", i, NULL);
         gtk_tree_view_column_set_sizing(treecol, GTK_TREE_VIEW_COLUMN_AUTOSIZE);
         gtk_tree_view_append_column(GTK_TREE_VIEW(treeview), treecol);
       }
@@ -1036,19 +967,15 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       for (i = 0; i < ncols; i++) cols[i] = G_TYPE_STRING;
       list = gtk_list_store_newv(ncols, cols);
       free(cols);
-      GtkTreeModel *filter = gtk_tree_model_filter_new(
-        GTK_TREE_MODEL(list), NULL);
+      GtkTreeModel *filter = gtk_tree_model_filter_new(GTK_TREE_MODEL(list), NULL);
       gtk_tree_model_filter_set_visible_func(
         GTK_TREE_MODEL_FILTER(filter), list_visible, (gpointer)entry, NULL);
       gtk_tree_view_set_model(GTK_TREE_VIEW(treeview), filter);
-      g_signal_connect(
-        G_OBJECT(entry), "key-release-event", G_CALLBACK(entry_keypress),
-        treeview);
+      g_signal_connect(G_OBJECT(entry), "key-release-event", G_CALLBACK(entry_keypress), treeview);
       gtk_container_add(GTK_CONTAINER(scrolled), treeview);
       if (select_multiple)
         gtk_tree_selection_set_mode(
-          gtk_tree_view_get_selection(
-            GTK_TREE_VIEW(treeview)), GTK_SELECTION_MULTIPLE);
+          gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview)), GTK_SELECTION_MULTIPLE);
       if (text) gtk_entry_set_text(GTK_ENTRY(entry), text);
       int col = 0;
       GtkTreeIter iter;
@@ -1058,13 +985,11 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         if (col == ncols) col = 0; // new row
       }
 #elif CURSES
-      entry = newCDKEntry(
-        dialog, LEFT, TOP, (char *)title, (char *)info_text, A_NORMAL, '_',
+      entry = newCDKEntry(dialog, LEFT, TOP, (char *)title, (char *)info_text, A_NORMAL, '_',
         vMIXED, 0, 0, 100, FALSE, FALSE);
       char **rows = item_rows((char **)cols, ncols, (char **)items, len);
       int num_rows = (len + ncols - 1) / ncols; // account for non-full rows
-      scrolled = newCDKScroll(
-        dialog, LEFT, CENTER, RIGHT, -6, 0, rows[-1], rows, num_rows, FALSE,
+      scrolled = newCDKScroll(dialog, LEFT, CENTER, RIGHT, -6, 0, rows[-1], rows, num_rows, FALSE,
         A_REVERSE, TRUE, FALSE);
       model.rows = rows, model.num_rows = num_rows;
       model.filtered_rows = malloc(sizeof(char *) * num_rows);
@@ -1087,14 +1012,12 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       gtk_box_pack_start(GTK_BOX(vbox), table, FALSE, TRUE, 5);
       for (i = 0; i < len; i++) {
         options[i] = gtk_check_button_new_with_mnemonic(items[i]);
-        gtk_table_attach(
-          GTK_TABLE(table), options[i], 0, 1, i, i + 1, GTK_FILL | GTK_SHRINK,
+        gtk_table_attach(GTK_TABLE(table), options[i], 0, 1, i, i + 1, GTK_FILL | GTK_SHRINK,
           GTK_FILL | GTK_SHRINK, 5, 0);
       }
 #elif CURSES
       const char *choices[] = {"[ ]", "[x]"};
-      options = newCDKSelection(
-        dialog, LEFT, TOP, NONE, height - 5, 0, (char *)text,
+      options = newCDKSelection(dialog, LEFT, TOP, NONE, height - 5, 0, (char *)text,
         (char **)items, len, (char **)choices, 2, A_REVERSE, FALSE, FALSE);
 #endif
       for (i = 0; i < select; i++) {
@@ -1110,45 +1033,37 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   } else if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE) {
     if (type == GTDIALOG_FILESELECT) {
 #if GTK
-      dialog = gtk_file_chooser_dialog_new(
-        title, parent, GTK_FILE_CHOOSER_ACTION_OPEN, GTK_STOCK_CANCEL,
-        GTK_RESPONSE_CANCEL, GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT, NULL);
+      dialog = gtk_file_chooser_dialog_new(title, parent, GTK_FILE_CHOOSER_ACTION_OPEN,
+        GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT, NULL);
       if (select_only_dirs)
-          gtk_file_chooser_set_action(
-            GTK_FILE_CHOOSER(dialog), GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
+        gtk_file_chooser_set_action(
+          GTK_FILE_CHOOSER(dialog), GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
 #elif CURSES
       dialog = initCDKScreen(newwin(height, width, 1, 1));
 #if (LIBRARY && !_WIN32)
       tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
 #endif
-      fileselect = newCDKFselect(
-        dialog, LEFT, TOP, height, width, (char *)title, (char *)text, A_NORMAL,
-        '_', A_REVERSE, "</B>", "</N>", "</N>", "</N>", TRUE, FALSE);
+      fileselect = newCDKFselect(dialog, LEFT, TOP, height, width, (char *)title, (char *)text,
+        A_NORMAL, '_', A_REVERSE, "</B>", "</N>", "</N>", "</N>", TRUE, FALSE);
 #endif
     } else {
 #if GTK
-      dialog = gtk_file_chooser_dialog_new(
-        title, parent, GTK_FILE_CHOOSER_ACTION_SAVE, GTK_STOCK_CANCEL,
-        GTK_RESPONSE_CANCEL, GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT, NULL);
-      gtk_file_chooser_set_do_overwrite_confirmation(
-        GTK_FILE_CHOOSER(dialog), TRUE);
-      if (no_create_dirs)
-        gtk_file_chooser_set_create_folders(GTK_FILE_CHOOSER(dialog), FALSE);
+      dialog = gtk_file_chooser_dialog_new(title, parent, GTK_FILE_CHOOSER_ACTION_SAVE,
+        GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT, NULL);
+      gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog), TRUE);
+      if (no_create_dirs) gtk_file_chooser_set_create_folders(GTK_FILE_CHOOSER(dialog), FALSE);
 #elif CURSES
       dialog = initCDKScreen(newwin(height, width, 1, 1));
 #if (LIBRARY && !_WIN32)
       tcsetattr(0, TCSANOW, &term); // restore initial terminal settings
 #endif
-      fileselect = newCDKFselect(
-        dialog, LEFT, TOP, height, width, (char *)title, (char *)text, A_NORMAL,
-        '_', A_REVERSE, "</B>", "</N>", "</N>", "</N>", TRUE, FALSE);
+      fileselect = newCDKFselect(dialog, LEFT, TOP, height, width, (char *)title, (char *)text,
+        A_NORMAL, '_', A_REVERSE, "</B>", "</N>", "</N>", "</N>", TRUE, FALSE);
 #endif
     }
 #if GTK
-    gtk_file_chooser_set_select_multiple(
-      GTK_FILE_CHOOSER(dialog), select_multiple);
-    if (with_dir)
-      gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), with_dir);
+    gtk_file_chooser_set_select_multiple(GTK_FILE_CHOOSER(dialog), select_multiple);
+    if (with_dir) gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), with_dir);
     if (filter) gtk_file_chooser_add_filter(GTK_FILE_CHOOSER(dialog), filter);
     if (with_dir && with_file && type == GTDIALOG_FILESELECT) {
       char *path = g_strconcat(with_dir, G_DIR_SEPARATOR_S, with_file, NULL);
@@ -1174,24 +1089,19 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     GtkWidget *sel = gtk_color_selection_dialog_get_color_selection(dlg);
     GdkColor gdk_color;
     if (gdk_color_parse(color, &gdk_color))
-      gtk_color_selection_set_current_color(
-        GTK_COLOR_SELECTION(sel), &gdk_color);
+      gtk_color_selection_set_current_color(GTK_COLOR_SELECTION(sel), &gdk_color);
     if (ncols > 0) {
-      g_object_get(
-        gtk_settings_get_default(), "gtk-color-palette", &default_palette,
+      g_object_get(gtk_settings_get_default(), "gtk-color-palette", &default_palette,
         NULL); // save for later restoration
       GString *gstr = g_string_new("");
-      for (i = 0; i < ncols && i < 20; i++)
-        g_string_append_printf(gstr, "%s:", cols[i]);
+      for (i = 0; i < ncols && i < 20; i++) g_string_append_printf(gstr, "%s:", cols[i]);
       for (i = ncols; i < 20; i++) g_string_append(gstr, "#FFF:"); // fill
       g_string_truncate(gstr, gstr->len - 1); // chop trailing ':'
       gtk_settings_set_string_property(
-        gtk_settings_get_default(), "gtk-color-palette", gstr->str,
-        "XProperty");
+        gtk_settings_get_default(), "gtk-color-palette", gstr->str, "XProperty");
       g_string_free(gstr, TRUE);
     }
-    if (cols)
-      gtk_color_selection_set_has_palette(GTK_COLOR_SELECTION(sel), TRUE);
+    if (cols) gtk_color_selection_set_has_palette(GTK_COLOR_SELECTION(sel), TRUE);
 #elif CURSES
     // There will be a border drawn later, but account for it now.
     dialog = initCDKScreen(newwin(height - 2, width - 2, 2, 2));
@@ -1228,13 +1138,11 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 
   // Run dialog, storing output in 'out'.
   char *out = NULL;
-  if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE &&
-      type != GTDIALOG_PROGRESSBAR && type != GTDIALOG_COLORSELECT &&
-      type != GTDIALOG_FONTSELECT) {
+  if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE && type != GTDIALOG_PROGRESSBAR &&
+    type != GTDIALOG_COLORSELECT && type != GTDIALOG_FONTSELECT) {
 #if GTK
     gtk_widget_show_all(dialog);
-    if (timeout_len)
-      g_timeout_add_seconds(timeout_len, timeout_dialog, (gpointer)dialog);
+    if (timeout_len) g_timeout_add_seconds(timeout_len, timeout_dialog, (gpointer)dialog);
     int response = gtk_dialog_run(GTK_DIALOG(dialog));
     if (response == GTK_RESPONSE_DELETE_EVENT) response = RESPONSE_DELETE;
 #elif CURSES
@@ -1242,39 +1150,32 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     box(border, 0, 0), wrefresh(border);
     refreshCDKScreen(dialog);
     int response;
-    if (type >= GTDIALOG_INPUTBOX &&
-        type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
+    if (type >= GTDIALOG_INPUTBOX && type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
       if (nrows > 1) {
         // Handle cycling through the multiple entries.
         activateCDKEntry(focused_entry = entries[0], NULL);
-        while (focused_entry->exitType == vNORMAL ||
-               focused_entry->exitType == vNEVER_ACTIVATED) {
-          if (focused_entry->exitType == vNORMAL &&
-              focused_entry == entries[nrows - 1]) break; // ENTER in last entry
+        while (focused_entry->exitType == vNORMAL || focused_entry->exitType == vNEVER_ACTIVATED) {
+          if (focused_entry->exitType == vNORMAL && focused_entry == entries[nrows - 1])
+            break; // ENTER in last entry
           for (i = 0; i < nrows; i++) entries[i]->exitType = vNEVER_ACTIVATED;
           activateCDKEntry(focused_entry, NULL);
         }
         entry = focused_entry;
-      } else activateCDKEntry(entry, NULL);
-      response = (entry->exitType == vNORMAL) ?
-        1 + buttonbox->currentButton : RESPONSE_DELETE;
+      } else
+        activateCDKEntry(entry, NULL);
+      response = (entry->exitType == vNORMAL) ? 1 + buttonbox->currentButton : RESPONSE_DELETE;
     } else if (type == GTDIALOG_TEXTBOX && focus_textbox) {
       activateCDKMentry(textview, NULL);
-      response = (textview->exitType == vNORMAL) ?
-        1 + buttonbox->currentButton : RESPONSE_DELETE;
-    } else if (type == GTDIALOG_DROPDOWN ||
-               type == GTDIALOG_STANDARD_DROPDOWN) {
+      response = (textview->exitType == vNORMAL) ? 1 + buttonbox->currentButton : RESPONSE_DELETE;
+    } else if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN) {
       activateCDKItemlist(combobox, NULL);
-      response = (combobox->exitType == vNORMAL) ?
-        1 + buttonbox->currentButton : RESPONSE_DELETE;
+      response = (combobox->exitType == vNORMAL) ? 1 + buttonbox->currentButton : RESPONSE_DELETE;
     } else if (type == GTDIALOG_FILTEREDLIST) {
       activateCDKEntry(entry, NULL);
-      response = (entry->exitType == vNORMAL) ?
-        1 + buttonbox->currentButton : RESPONSE_DELETE;
+      response = (entry->exitType == vNORMAL) ? 1 + buttonbox->currentButton : RESPONSE_DELETE;
     } else if (type == GTDIALOG_OPTIONSELECT) {
       activateCDKSelection(options, NULL);
-      response = (options->exitType == vNORMAL) ?
-        1 + buttonbox->currentButton : RESPONSE_DELETE;
+      response = (options->exitType == vNORMAL) ? 1 + buttonbox->currentButton : RESPONSE_DELETE;
     } else {
       response = 1 + activateCDKButtonbox(buttonbox, NULL);
       // activateCDKButtonbox returns -1 on escape so check for response == 0.
@@ -1296,7 +1197,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       if (info_text) destroyCDKLabel(labeli);
 #endif
     } else if (type >= GTDIALOG_INPUTBOX && type != GTDIALOG_FILESELECT &&
-               type != GTDIALOG_FILESAVE && type != GTDIALOG_PROGRESSBAR) {
+      type != GTDIALOG_FILESAVE && type != GTDIALOG_PROGRESSBAR) {
       if (response > RESPONSE_TIMEOUT) {
         char *txt = "";
         int created = FALSE;
@@ -1312,19 +1213,19 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
             txt = copy(gstr->str), created = TRUE;
             if (strlen(txt) > 0) txt[strlen(txt) - 1] = '\0'; // chomp '\n'
             g_string_free(gstr, TRUE);
-          } else txt = (char *)gtk_entry_get_text(GTK_ENTRY(entry));
+          } else
+            txt = (char *)gtk_entry_get_text(GTK_ENTRY(entry));
 #elif CURSES
           if (nrows > 1) {
             // Combine multiple entries into a '\n' separated string.
             int len = 1;
-            for (i = 0; i < nrows; i++)
-              len += strlen(getCDKEntryValue(entries[i])) + 1;
+            for (i = 0; i < nrows; i++) len += strlen(getCDKEntryValue(entries[i])) + 1;
             txt = malloc(len), created = TRUE;
             char *p = txt;
-            for (i = 0; i < nrows; i++)
-              p = stpcpy_(p, getCDKEntryValue(entries[i])), *p++ = '\n';
+            for (i = 0; i < nrows; i++) p = stpcpy_(p, getCDKEntryValue(entries[i])), *p++ = '\n';
             if (p - txt > 0) *p = '\0'; // chomp '\n'
-          } else txt = copy(getCDKEntryValue(entry)), created = TRUE;
+          } else
+            txt = copy(getCDKEntryValue(entry)), created = TRUE;
 #endif
         } else if (type == GTDIALOG_TEXTBOX && editable) {
 #if GTK
@@ -1341,19 +1242,16 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #elif CURSES
           txt = copy(getCDKMentryValue(textview)), created = TRUE;
 #endif
-        } else if (type == GTDIALOG_DROPDOWN ||
-                   type == GTDIALOG_STANDARD_DROPDOWN) {
+        } else if (type == GTDIALOG_DROPDOWN || type == GTDIALOG_STANDARD_DROPDOWN) {
           if (string_output) {
 #if GTK
             txt = gtk_combo_box_get_active_text(GTK_COMBO_BOX(combobox));
 #elif CURSES
-            if (len > 0)
-              txt = (char *)items[getCDKItemlistCurrentItem(combobox)];
+            if (len > 0) txt = (char *)items[getCDKItemlistCurrentItem(combobox)];
 #endif
           } else {
             txt = malloc(4), created = TRUE;
-            sprintf(
-              txt, "%i",
+            sprintf(txt, "%i",
 #if GTK
               gtk_combo_box_get_active(GTK_COMBO_BOX(combobox)));
 #elif CURSES
@@ -1364,8 +1262,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if GTK
           GString *gstr = g_string_new("");
           gtk_tree_selection_selected_foreach(
-            gtk_tree_view_get_selection(
-              GTK_TREE_VIEW(treeview)), list_foreach, gstr);
+            gtk_tree_view_get_selection(GTK_TREE_VIEW(treeview)), list_foreach, gstr);
           txt = copy(gstr->str), created = TRUE;
           if (strlen(txt) > 0) txt[strlen(txt) - 1] = '\0'; // chomp '\n'
           g_string_free(gstr, TRUE);
@@ -1381,9 +1278,9 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
                 }
             }
             if (string_output) {
-              if (i * ncols + output_col - 1 < len)
-                txt = (char *)items[i * ncols + output_col - 1];
-            } else txt = malloc(4), sprintf(txt, "%i", i), created = TRUE;
+              if (i * ncols + output_col - 1 < len) txt = (char *)items[i * ncols + output_col - 1];
+            } else
+              txt = malloc(4), sprintf(txt, "%i", i), created = TRUE;
           }
 #endif
         } else if (type == GTDIALOG_OPTIONSELECT) {
@@ -1395,7 +1292,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
             if (string_output) {
               g_string_append(gstr, gtk_button_get_label(GTK_BUTTON(opt)));
               g_string_append_c(gstr, '\n');
-            } else g_string_append_printf(gstr, "%i\n", i);
+            } else
+              g_string_append_printf(gstr, "%i\n", i);
           }
           txt = copy(gstr->str), created = TRUE;
           if (strlen(txt) > 0) txt[strlen(txt) - 1] = '\0'; // chomp '\n'
@@ -1425,12 +1323,11 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         if (created) free(txt);
       }
     }
-  } else if (type == GTDIALOG_FILESELECT || type ==  GTDIALOG_FILESAVE) {
+  } else if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE) {
 #if GTK
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
       GtkFileChooser *chooser = GTK_FILE_CHOOSER(dialog);
-      if (type == GTDIALOG_FILESELECT &&
-          gtk_file_chooser_get_select_multiple(chooser)) {
+      if (type == GTDIALOG_FILESELECT && gtk_file_chooser_get_select_multiple(chooser)) {
         out = copy("");
         GSList *filenames = gtk_file_chooser_get_filenames(chooser), *i = NULL;
         for (i = filenames; i; i = i->next) {
@@ -1439,8 +1336,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
           out = new_out;
         }
         g_slist_free(filenames);
-      } else out = copy(gtk_file_chooser_get_filename(chooser));
-    } else out = copy("");
+      } else
+        out = copy(gtk_file_chooser_get_filename(chooser));
+    } else
+      out = copy("");
 #elif CURSES
     char *txt = activateCDKFselect(fileselect, NULL);
     if (select_only_dirs) txt = getCDKFselectDirectory(fileselect);
@@ -1452,8 +1351,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #if GTK
 #ifndef LIBRARY
     gtk_binding_entry_remove(
-      gtk_binding_set_by_class(GTK_DIALOG_GET_CLASS(dialog)), GDK_KEY_Escape,
-      0);
+      gtk_binding_set_by_class(GTK_DIALOG_GET_CLASS(dialog)), GDK_KEY_Escape, 0);
 #endif
     gtk_widget_show_all(GTK_WIDGET(dialog));
     if (!progressbar_cb) {
@@ -1490,8 +1388,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
         char *p = input;
         while (!isspace(*p)) p++;
         *p = '\0', p[strlen(p + 1)] = '\0'; // chomp '\n'
-        if (!indeterminate)
-          setCDKSliderValue(progressbar, atoi(input));
+        if (!indeterminate) setCDKSliderValue(progressbar, atoi(input));
         if (*(p + 1)) {
           if (stoppable) {
             if (strcmp(p + 1, "stop enable") == 0) {
@@ -1529,16 +1426,15 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       GtkColorSelectionDialog *dlg = GTK_COLOR_SELECTION_DIALOG(dialog);
       GtkWidget *sel = gtk_color_selection_dialog_get_color_selection(dlg);
       GdkColor gdk_color;
-      gtk_color_selection_get_current_color(
-        GTK_COLOR_SELECTION(sel), &gdk_color);
+      gtk_color_selection_get_current_color(GTK_COLOR_SELECTION(sel), &gdk_color);
       out = malloc(8);
       sprintf(
-        out, "#%02X%02X%02X", gdk_color.red / 256, gdk_color.green / 256,
-        gdk_color.blue / 256);
-    } else out = copy("");
+        out, "#%02X%02X%02X", gdk_color.red / 256, gdk_color.green / 256, gdk_color.blue / 256);
+    } else
+      out = copy("");
     if (default_palette)
-      gtk_settings_set_string_property(
-        gtk_settings_get_default(), "gtk-color-palette", default_palette,
+      gtk_settings_set_string_property(gtk_settings_get_default(), "gtk-color-palette",
+        default_palette,
         "XProperty"); // restore default
 #elif CURSES
     // TODO:
@@ -1549,7 +1445,8 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_OK) {
       GtkFontSelectionDialog *dlg = GTK_FONT_SELECTION_DIALOG(dialog);
       out = copy(gtk_font_selection_dialog_get_font_name(dlg));
-    } else out = copy("");
+    } else
+      out = copy("");
 #elif CURSES
     // TODO:
     out = copy("");
@@ -1593,6 +1490,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   return out;
 }
 
+// clang-format off
 // Help on dialog types.
 #define HELP_MSGBOX \
 "gtdialog msgbox [args]\n" \
@@ -1989,6 +1887,7 @@ HELP_FONTSELECT \
 // Help template.
 #define HELP(type, args, returns, example) \
 type "\nArguments:\n" HELP_DEFAULT_ARGS args "\n" returns "\nExample:\n" example
+// clang-format on
 
 /**
  * Prints help for the gtdialog to the command line.
@@ -2001,6 +1900,7 @@ int help(int argc, char *argv[]) {
   case GTDIALOG_MSGBOX:
   case GTDIALOG_OK_MSGBOX:
   case GTDIALOG_YESNO_MSGBOX:
+    // clang-format off
     puts(HELP(
       HELP_MSGBOX,
       HELP_TEXT_MAIN
@@ -2015,11 +1915,13 @@ int help(int argc, char *argv[]) {
       HELP_MSGBOX_RETURN
       HELP_LOCALIZED_BUTTONS,
       HELP_MSGBOX_EXAMPLE));
+    // clang-format on
     break;
   case GTDIALOG_INPUTBOX:
   case GTDIALOG_STANDARD_INPUTBOX:
   case GTDIALOG_SECURE_INPUTBOX:
   case GTDIALOG_SECURE_STANDARD_INPUTBOX:
+    // clang-format off
     puts(HELP(
       HELP_INPUTBOX,
       HELP_INFORMATIVE_TEXT_INPUTBOX
@@ -2033,9 +1935,11 @@ int help(int argc, char *argv[]) {
       HELP_INPUTBOX_RETURN
       HELP_LOCALIZED_BUTTONS,
       HELP_INPUTBOX_EXAMPLE));
+    // clang-format on
     break;
   case GTDIALOG_FILESELECT:
   case GTDIALOG_FILESAVE:
+    // clang-format off
     puts(HELP(
       HELP_FILE,
       HELP_WITH_DIRECTORY
@@ -2046,8 +1950,10 @@ int help(int argc, char *argv[]) {
       HELP_NO_CREATE_DIRECTORIES,
       HELP_FILE_RETURN,
       HELP_FILE_EXAMPLE));
+    // clang-format on
     break;
   case GTDIALOG_TEXTBOX:
+    // clang-format off
     puts(HELP(
       HELP_TEXTBOX,
       HELP_INFORMATIVE_TEXT_TEXTBOX
@@ -2065,8 +1971,10 @@ int help(int argc, char *argv[]) {
       HELP_TEXTBOX_RETURN
       HELP_LOCALIZED_BUTTONS,
       HELP_TEXTBOX_EXAMPLE));
+    // clang-format on
     break;
   case GTDIALOG_PROGRESSBAR:
+    // clang-format off
     puts(HELP(
       HELP_PROGRESSBAR,
       HELP_PERCENT
@@ -2076,9 +1984,11 @@ int help(int argc, char *argv[]) {
       HELP_FLOAT,
       HELP_PROGRESSBAR_RETURN,
       HELP_PROGRESSBAR_EXAMPLE));
+    // clang-format on
     break;
   case GTDIALOG_DROPDOWN:
   case GTDIALOG_STANDARD_DROPDOWN:
+    // clang-format off
     puts(HELP(
       HELP_DROPDOWN,
       HELP_TEXT_MAIN
@@ -2093,8 +2003,10 @@ int help(int argc, char *argv[]) {
       HELP_DROPDOWN_RETURN
       HELP_LOCALIZED_BUTTONS,
       HELP_DROPDOWN_EXAMPLE));
+    // clang-format on
     break;
   case GTDIALOG_FILTEREDLIST:
+    // clang-format off
     puts(HELP(
       HELP_FILTEREDLIST,
       HELP_INFORMATIVE_TEXT_FILTEREDLIST
@@ -2111,8 +2023,10 @@ int help(int argc, char *argv[]) {
       HELP_FILTEREDLIST_RETURN
       HELP_LOCALIZED_BUTTONS,
       HELP_FILTEREDLIST_EXAMPLE));
+    // clang-format on
     break;
   case GTDIALOG_OPTIONSELECT:
+    // clang-format off
     puts(HELP(
       HELP_OPTIONSELECT,
       HELP_TEXT_OPTIONSELECT
@@ -2125,8 +2039,10 @@ int help(int argc, char *argv[]) {
       HELP_OPTIONSELECT_RETURN
       HELP_LOCALIZED_BUTTONS,
       HELP_OPTIONSELECT_EXAMPLE));
+    // clang-format on
     break;
   case GTDIALOG_COLORSELECT:
+    // clang-format off
     puts(HELP(
       HELP_COLORSELECT,
       HELP_COLOR_COLORSELECT
@@ -2134,8 +2050,10 @@ int help(int argc, char *argv[]) {
       HELP_FLOAT,
       HELP_COLORSELECT_RETURN,
       HELP_COLORSELECT_EXAMPLE));
+    // clang-format on
     break;
   case GTDIALOG_FONTSELECT:
+    // clang-format off
     puts(HELP(
       HELP_FONTSELECT,
       HELP_TEXT_FONTSELECT
@@ -2145,9 +2063,9 @@ int help(int argc, char *argv[]) {
       HELP_FLOAT,
       HELP_FONTSELECT_RETURN,
       HELP_FONTSELECT_EXAMPLE));
+    // clang-format on
     break;
-  default:
-    puts(HELP_ALL);
+  default: puts(HELP_ALL);
   }
 #endif
   return 1;
