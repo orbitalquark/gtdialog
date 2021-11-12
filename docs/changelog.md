@@ -2,7 +2,7 @@
 
 [Atom Feed](https://github.com/orbitalquark/gtdialog/releases.atom)
 
-### 1.5 (?)
+### 1.5 (11 Nov 2021)
 
 Download:
 
