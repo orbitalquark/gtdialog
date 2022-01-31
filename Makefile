@@ -1,4 +1,4 @@
-# Copyright 2009-2021 Mitchell.
+# Copyright 2009-2022 Mitchell.
 
 CC = gcc
 PREFIX ?= /usr/local
