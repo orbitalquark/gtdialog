@@ -1033,8 +1033,12 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   } else if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE) {
     if (type == GTDIALOG_FILESELECT) {
 #if GTK
+#if GTK_CHECK_VERSION(3, 20, 0)
+      dialog = gtk_file_chooser_native_new(title, parent, GTK_FILE_CHOOSER_ACTION_OPEN, NULL, NULL);
+#else
       dialog = gtk_file_chooser_dialog_new(title, parent, GTK_FILE_CHOOSER_ACTION_OPEN,
         GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT, NULL);
+#endif
       if (select_only_dirs)
         gtk_file_chooser_set_action(
           GTK_FILE_CHOOSER(dialog), GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER);
@@ -1048,8 +1052,12 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
     } else {
 #if GTK
+#if GTK_CHECK_VERSION(3, 20, 0)
+      dialog = gtk_file_chooser_native_new(title, parent, GTK_FILE_CHOOSER_ACTION_SAVE, NULL, NULL);
+#else
       dialog = gtk_file_chooser_dialog_new(title, parent, GTK_FILE_CHOOSER_ACTION_SAVE,
         GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL, GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT, NULL);
+#endif
       gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog), TRUE);
       if (no_create_dirs) gtk_file_chooser_set_create_folders(GTK_FILE_CHOOSER(dialog), FALSE);
 #elif CURSES
@@ -1325,7 +1333,12 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
     }
   } else if (type == GTDIALOG_FILESELECT || type == GTDIALOG_FILESAVE) {
 #if GTK
-    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+#if GTK_CHECK_VERSION(3, 22, 0)
+    int response = gtk_native_dialog_run(GTK_NATIVE_DIALOG(dialog));
+#else
+    int response = gtk_dialog_run(GTK_DIALOG(dialog));
+#endif
+    if (response == GTK_RESPONSE_ACCEPT) {
       GtkFileChooser *chooser = GTK_FILE_CHOOSER(dialog);
       if (type == GTDIALOG_FILESELECT && gtk_file_chooser_get_select_multiple(chooser)) {
         out = copy("");
