@@ -92,7 +92,7 @@ The standalone command line application is executed as follows:
 where `type` specifies which dialog to use, and `arguments` is a set of arguments for that
 dialog type. For example:
 
-    gtdialog yesno-msgbox --title Confirm --text "Quit?" --icon gtk-dialog-question
+    gtdialog yesno-msgbox --title Confirm --text "Quit?" --icon dialog-question
 
 Running `gtdialog help` shows a list of dialog types along with a brief description for each,
 and running `gtdialog help type` shows all available arguments for that dialog type.

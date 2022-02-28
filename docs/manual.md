@@ -20,9 +20,8 @@
 * `--height int`: Manually set the height of the dialog in pixels if possible.
 * `--text str`: The main message text.
 * `--informative-text str`: Extra informative text.
-* `--icon str`: The name of the [GTK stock icon][] to display. No icon is displayed by
-  default. Examples are "gtk-dialog-error", "gtk-dialog-info", "gtk-dialog-question", and
-  "gtk-dialog-warning".
+* `--icon str`: The name of an [icon][] to display. No icon is displayed by default.  Examples are
+  "dialog-error", "dialog-information", "dialog-question", and "dialog-warning".
 * `--icon-file str`: The path to the icon to display. Has no effect when `--icon` is present.
 * `--button1 str`: The right-most button's label. The default is "Ok" for `ok-msgbox` and "Yes"
   for `yesno-msgbox`.
@@ -35,7 +34,7 @@
 * `--timeout int`: The number of seconds the dialog waits for a button click before timing
   out. Dialogs do not time out by default.
 
-[GTK stock icon]: https://developer.gnome.org/gtk3/stable/gtk3-Stock-Items.html
+  [icon]: https://specifications.freedesktop.org/icon-naming-spec/icon-naming-spec-latest.html
 
 **Returns**
 
@@ -46,7 +45,7 @@ or "delete" if the user canceled the dialog.
 
 **Example**
 
-    gtdialog msgbox --title 'EOL Mode' --text 'Which EOL?' --icon gtk-dialog-question \
+    gtdialog msgbox --title 'EOL Mode' --text 'Which EOL?' --icon dialog-question \
       --button1 CRLF --button2 CR --button3 LF
 
 - - -

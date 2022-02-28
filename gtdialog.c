@@ -775,7 +775,7 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       gtk_box_pack_start(GTK_BOX(vbox), hbox, FALSE, FALSE, 0);
       GtkWidget *image = NULL;
       if (icon)
-        image = gtk_image_new_from_stock(icon, GTK_ICON_SIZE_DIALOG);
+        image = gtk_image_new_from_icon_name(icon, GTK_ICON_SIZE_DIALOG);
       else
         image = gtk_image_new_from_file(icon_file);
 #if GTK_CHECK_VERSION(3, 0, 0)
@@ -1585,8 +1585,8 @@ HELP_FONTSELECT \
 "  --icon str\n" \
 "      The name of the GTK stock icon to display. No icon is displayed\n" \
 "      by default.\n" \
-"      Examples are “gtk-dialog-error”, “gtk-dialog-info”,\n" \
-"      “gtk-dialog-question”, and “gtk-dialog-warning”.\n"
+"      Examples are “dialog-error”, “dialog-information”,\n" \
+"      “dialog-question”, and “dialog-warning”.\n"
 #define HELP_ICON_FILE \
 "  --icon-file str\n" \
 "      The path to the icon to display.\n" \
@@ -1799,7 +1799,7 @@ HELP_FONTSELECT \
 "\nFor GTK only, button labels with GTK stock item labels are automatically\n" \
 "localized. However, when --string-output is given, the stock item label is\n" \
 "returned, not the actual, localized label. The default button labels are\n" \
-"all stock item labels (“gtk-ok”, “gtk-cancel”, “gtk-yes”, and “gtk-no”).\n"
+"all stock item labels (“gtk -ok”, “gtk-cancel”, “gtk-yes”, and “gtk-no”).\n"
 #define HELP_INPUTBOX_RETURN \
 "The input dialogs return a string containing the number of the button\n" \
 "pressed followed by a newline character (‘\\n’) and the input text\n" \
@@ -1866,7 +1866,7 @@ HELP_FONTSELECT \
 // Help with dialog examples.
 #define HELP_MSGBOX_EXAMPLE \
 "  gtdialog msgbox --title 'EOL Mode' --text 'Which EOL?' \\\n" \
-"    --icon gtk-dialog-question \\\n" \
+"    --icon dialog-question \\\n" \
 "    --button1 CRLF --button2 CR --button3 LF\n"
 #define HELP_INPUTBOX_EXAMPLE \
 "  gtdialog standard-inputbox --title 'Goto Line' \\\n" \
