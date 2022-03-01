@@ -1380,16 +1380,19 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
       int source = g_io_add_watch(ch, G_IO_IN | G_IO_HUP, read_stdin, dialog);
       if (gtk_dialog_run(GTK_DIALOG(dialog)) != 1)
         out = copy("");
-      else
+      else {
         out = copy("stopped");
-      g_source_remove(source), g_io_channel_unref(ch), g_io_channel_unref(ch);
+        g_source_remove(source);
+      }
+      g_io_channel_unref(ch), g_io_channel_unref(ch);
     } else {
       int source = g_timeout_add(0, call_progressbar_callback, dialog);
       if (gtk_dialog_run(GTK_DIALOG(dialog)) != 1)
         out = copy("");
-      else
+      else {
         out = copy("stopped");
-      g_source_remove(source);
+        g_source_remove(source);
+      }
       progressbar_cb = NULL, progressbar_cb_userdata = NULL;
     }
 #elif CURSES
