@@ -1141,7 +1141,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
 #endif
   }
 #if GTK
-  gtk_window_set_wmclass(GTK_WINDOW(dialog), "gtdialog", "gtdialog");
+#if GTK_CHECK_VERSION(3, 22, 0)
+  if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE) // cannot set for native dialogs
+#endif
+    gtk_window_set_wmclass(GTK_WINDOW(dialog), "gtdialog", "gtdialog");
 #endif
 
   // Run dialog, storing output in 'out'.
@@ -1470,7 +1473,10 @@ char *gtdialog(GTDialogType type, int narg, const char *args[]) {
   else if (strcmp(out, "-1") == 0 && string_output)
     out = copy("delete");
 #if GTK
-  gtk_widget_destroy(dialog);
+#if GTK_CHECK_VERSION(3, 22, 0)
+  if (type != GTDIALOG_FILESELECT && type != GTDIALOG_FILESAVE) // cannot destroy native dialogs
+#endif
+    gtk_widget_destroy(dialog);
 #elif CURSES
   if (type <= GTDIALOG_SECURE_STANDARD_INPUTBOX) {
     if (nrows < 2)
