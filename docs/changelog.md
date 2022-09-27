@@ -2,6 +2,23 @@
 
 [Atom Feed](https://github.com/orbitalquark/gtdialog/releases.atom)
 
+### 1.6 (27 Sep 2022)
+
+Download:
+
+* [gtDialog 1.6][]
+
+Bugfixes:
+
+* Fixed resource handling in GUI progressbar dialog.
+
+Changes:
+
+* Prefer icons named in the Free Desktop Icon Naming Specification.
+* Use native fileselect or filesave dialog if possible in the GUI.
+
+[gtDialog 1.6]: https://github.com/orbitalquark/gtdialog/archive/gtdialog_1.6.zip
+
 ### 1.5 (11 Nov 2021)
 
 Download:
